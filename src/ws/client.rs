@@ -20,7 +20,7 @@ use tokio::time::{Duration, sleep, timeout as tokio_timeout};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-use tokio_tungstenite::tungstenite::http::{HeaderValue, Request};
+use tokio_tungstenite::tungstenite::http::{HeaderValue, Request, header::HeaderName};
 
 type WsStream =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
@@ -304,16 +304,16 @@ impl KalshiWsLowLevelClient {
         let headers = auth.build_headers("GET", WS_PATH)?;
 
         req.headers_mut().insert(
-            "KALSHI-ACCESS-KEY",
+            HeaderName::from_static("kalshi-access-key"),
             HeaderValue::from_str(&headers.key).map_err(|e| KalshiError::Header(e.to_string()))?,
         );
         req.headers_mut().insert(
-            "KALSHI-ACCESS-SIGNATURE",
+            HeaderName::from_static("kalshi-access-signature"),
             HeaderValue::from_str(&headers.signature)
                 .map_err(|e| KalshiError::Header(e.to_string()))?,
         );
         req.headers_mut().insert(
-            "KALSHI-ACCESS-TIMESTAMP",
+            HeaderName::from_static("kalshi-access-timestamp"),
             HeaderValue::from_str(&headers.timestamp_ms)
                 .map_err(|e| KalshiError::Header(e.to_string()))?,
         );

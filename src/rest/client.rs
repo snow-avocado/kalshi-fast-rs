@@ -134,7 +134,7 @@ fn build_http_error(
     bytes: &[u8],
     request_id: Option<String>,
 ) -> KalshiError {
-    #[derive(serde::Deserialize)]
+    #[derive(serde::Deserialize, serde::Serialize)]
     struct WrappedErrorBody {
         error: ErrorResponse,
     }

@@ -817,7 +817,8 @@ pub struct GetMarketOrderbookParams {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetMarketOrderbookResponse {
-    pub orderbook: Orderbook,
+    #[serde(default)]
+    pub orderbook: Option<Orderbook>,
     #[serde(default)]
     pub orderbook_fp: Option<OrderbookFp>,
 }

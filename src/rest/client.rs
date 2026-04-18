@@ -770,6 +770,46 @@ impl KalshiRestClient {
         }
     }
 
+    fn event_forecast_percentile_history_query(
+        params: &GetEventForecastPercentileHistoryParams,
+    ) -> Vec<(String, String)> {
+        let mut query = Vec::with_capacity(params.percentiles.len() + 3);
+        for percentile in &params.percentiles {
+            query.push(("percentiles".to_string(), percentile.to_string()));
+        }
+        query.push(("start_ts".to_string(), params.start_ts.to_string()));
+        query.push(("end_ts".to_string(), params.end_ts.to_string()));
+        query.push((
+            "period_interval".to_string(),
+            params.period_interval.to_string(),
+        ));
+        query
+    }
+
+    fn structured_targets_query(params: &GetStructuredTargetsParams) -> Vec<(String, String)> {
+        let mut query = Vec::new();
+
+        if let Some(ids) = &params.ids {
+            for id in ids {
+                query.push(("ids".to_string(), id.clone()));
+            }
+        }
+        if let Some(target_type) = &params.target_type {
+            query.push(("type".to_string(), target_type.clone()));
+        }
+        if let Some(competition) = &params.competition {
+            query.push(("competition".to_string(), competition.clone()));
+        }
+        if let Some(page_size) = params.page_size {
+            query.push(("page_size".to_string(), page_size.to_string()));
+        }
+        if let Some(cursor) = &params.cursor {
+            query.push(("cursor".to_string(), cursor.clone()));
+        }
+
+        query
+    }
+
     // -----------------------------------------------
     // Series
     // -----------------------------------------------
@@ -1765,7 +1805,8 @@ impl KalshiRestClient {
         let path = Self::full_path(&format!(
             "/series/{series_ticker}/events/{ticker}/forecast_percentile_history"
         ));
-        self.send(Method::GET, &path, Some(&params), Option::<&()>::None, true)
+        let query = Self::event_forecast_percentile_history_query(&params);
+        self.send(Method::GET, &path, Some(&query), Option::<&()>::None, true)
             .await
     }
 
@@ -1774,14 +1815,9 @@ impl KalshiRestClient {
         params: GetStructuredTargetsParams,
     ) -> Result<GetStructuredTargetsResponse, KalshiError> {
         let path = Self::full_path("/structured_targets");
-        self.send(
-            Method::GET,
-            &path,
-            Some(&params),
-            Option::<&()>::None,
-            false,
-        )
-        .await
+        let query = Self::structured_targets_query(&params);
+        self.send(Method::GET, &path, Some(&query), Option::<&()>::None, false)
+            .await
     }
 
     pub async fn get_structured_target(
@@ -1957,6 +1993,7 @@ impl KalshiRestClient {
         &self,
         params: GetOrderQueuePositionsParams,
     ) -> Result<GetOrderQueuePositionsResponse, KalshiError> {
+        params.validate()?;
         let path = Self::full_path("/portfolio/orders/queue_positions");
         self.send(Method::GET, &path, Some(&params), Option::<&()>::None, true)
             .await

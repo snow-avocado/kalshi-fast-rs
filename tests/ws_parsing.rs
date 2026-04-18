@@ -212,10 +212,8 @@ fn ws_orderbook_snapshot_deserializes() {
         "msg": {
             "market_ticker": "INXD-25JAN10-T17900",
             "market_id": "abc123",
-            "yes": [[50, 100], [51, 200]],
-            "yes_dollars": [["0.50", 100], ["0.51", 200]],
-            "no": [[49, 150]],
-            "no_dollars": [["0.49", 150]]
+            "yes_dollars_fp": [["0.50", "100.00"], ["0.51", "200.00"]],
+            "no_dollars_fp": [["0.49", "150.00"]]
         }
     }"#;
 
@@ -224,7 +222,7 @@ fn ws_orderbook_snapshot_deserializes() {
     match msg {
         WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot { msg, .. }) => {
             assert_eq!(msg.market_ticker, "INXD-25JAN10-T17900");
-            assert_eq!(msg.yes.len(), 2);
+            assert_eq!(msg.yes_dollars_fp.len(), 2);
         }
         other => panic!("unexpected: {:?}", other),
     }

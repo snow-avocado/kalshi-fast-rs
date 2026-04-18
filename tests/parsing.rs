@@ -6,12 +6,13 @@ use kalshi_fast::{
     ErrorResponse, EventData, EventMetadata, EventStatus, GetAccountApiLimitsResponse,
     GetEventsParams, GetExchangeAnnouncementsResponse, GetExchangeScheduleResponse,
     GetExchangeStatusResponse, GetFillsParams, GetFillsResponse, GetMarketOrderbookResponse,
-    GetMarketsParams, GetOrdersParams, GetPositionsParams, GetSeriesFeeChangesParams,
-    GetSeriesFeeChangesResponse, GetSettlementsParams, GetSettlementsResponse,
-    GetSubaccountBalancesResponse, GetSubaccountTransfersParams, GetSubaccountTransfersResponse,
-    GetTradesParams, GetTradesResponse, GetUserDataTimestampResponse, MarketMetadata, MarketStatus,
-    MarketStatusConversionError, MarketStatusQuery, MveFilter, OrderStatus, OrderType,
-    PositionCountFilter, PriceRange, SelfTradePreventionType, TimeInForce, YesNo,
+    GetMarketsParams, GetOrderQueuePositionsParams, GetOrdersParams, GetPositionsParams,
+    GetSeriesFeeChangesParams, GetSeriesFeeChangesResponse, GetSettlementsParams,
+    GetSettlementsResponse, GetSubaccountBalancesResponse, GetSubaccountTransfersParams,
+    GetSubaccountTransfersResponse, GetTradesParams, GetTradesResponse,
+    GetUserDataTimestampResponse, MarketMetadata, MarketStatus, MarketStatusConversionError,
+    MarketStatusQuery, MveFilter, OrderStatus, OrderType, PositionCountFilter, PriceRange,
+    SelfTradePreventionType, TimeInForce, YesNo,
 };
 
 // ============================================================================
@@ -991,12 +992,6 @@ fn cancel_order_response_deserializes() {
 #[test]
 fn get_market_orderbook_response_deserializes() {
     let json = r#"{
-        "orderbook": {
-            "yes": [[50, 100]],
-            "no": [[49, 200]],
-            "yes_dollars": [["0.50", 100]],
-            "no_dollars": [["0.49", 200]]
-        },
         "orderbook_fp": {
             "yes_dollars": [["0.50", "100.00"]],
             "no_dollars": [["0.49", "200.00"]]
@@ -1004,7 +999,6 @@ fn get_market_orderbook_response_deserializes() {
     }"#;
 
     let resp: GetMarketOrderbookResponse = serde_json::from_str(json).unwrap();
-    assert_eq!(resp.orderbook.yes.len(), 1);
     assert_eq!(resp.orderbook_fp.yes_dollars.len(), 1);
 }
 
@@ -1340,6 +1334,11 @@ fn get_positions_params_validates_subaccount_bounds() {
         ..Default::default()
     };
     assert!(params.validate().is_err());
+}
+
+#[test]
+fn get_order_queue_positions_params_allows_unfiltered_requests() {
+    assert!(GetOrderQueuePositionsParams::default().validate().is_ok());
 }
 
 #[test]

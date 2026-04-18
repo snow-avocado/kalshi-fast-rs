@@ -208,8 +208,8 @@ async fn test_get_market_orderbook() {
     .expect("timeout")
     .expect("request failed");
 
-    assert!(resp.orderbook.yes.len() <= 1);
-    assert!(resp.orderbook.no.len() <= 1);
+    assert!(resp.orderbook_fp.yes_dollars.len() <= 1);
+    assert!(resp.orderbook_fp.no_dollars.len() <= 1);
 }
 
 #[tokio::test]

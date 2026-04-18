@@ -133,10 +133,10 @@ async fn main() -> anyhow::Result<()> {
             WsEvent::Message(msg) => match msg {
                 WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot { msg, seq, .. }) => {
                     println!(
-                        "[SNAPSHOT] {} | yes={} no={} | seq={:?}",
+                        "[SNAPSHOT] {} | yes_fp={} no_fp={} | seq={:?}",
                         msg.market_ticker,
-                        msg.yes.len(),
-                        msg.no.len(),
+                        msg.yes_dollars_fp.len(),
+                        msg.no_dollars_fp.len(),
                         seq
                     );
                 }

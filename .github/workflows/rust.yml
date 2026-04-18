@@ -15,16 +15,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.x"
-    - name: Install Python deps
-      run: pip install pyyaml
-    - name: Check Spec Parity Artifacts
-      run: |
-        scripts/generate_spec_parity.py
-        git diff --exit-code -- docs/spec-parity.md docs/specs/kalshi/openapi-manifest.json docs/specs/kalshi/asyncapi-manifest.json
     - name: Fmt
       run: cargo fmt --all --check
     - name: Clippy

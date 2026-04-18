@@ -1,11 +1,7 @@
 # Kalshi Rust Client
 
-## Spec Parity
-- OpenAPI snapshot: `docs/specs/kalshi/openapi.yaml`
-- AsyncAPI snapshot: `docs/specs/kalshi/asyncapi.yaml`
-- Generated parity report: `docs/spec-parity.md`
-- Regenerate parity artifacts:
-  - `scripts/generate_spec_parity.py`
+## Spec Notes
+- Spec notes: `docs/spec-parity.md`
 
 ## WebSocket Auth
 Kalshi WebSocket connections require authentication, even when subscribing to public channels. Use `KalshiWsClient::connect_authenticated` and provide `KALSHI_KEY_ID` and `KALSHI_PRIVATE_KEY_PATH`.

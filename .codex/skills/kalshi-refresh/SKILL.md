@@ -56,6 +56,10 @@ preserving:
    code, tests, docs, and examples. Remove or update stale deprecated
    endpoints, fields, enums, examples, and tests instead of carrying them
    forward silently.
+   - if a field or response shape was removed from the live schema, remove it
+     from the public Rust API rather than preserving it as an optional field,
+     compatibility alias, or synthesized legacy view unless `docs/spec-parity.md`
+     documents an explicit exception.
 6. Update `docs/spec-parity.md` only for durable human-facing notes about
    distinctions or behaviors that are not obvious from the YAML alone. Do not
    turn it into a raw diff dump.
@@ -65,7 +69,12 @@ preserving:
    `VERSIONING.md`:
    - patch for Rust API non-breaking refreshes
    - minor for Rust API breaking changes
+   - this only applies if the current branch is version agnostic.
+   - always look at the current branch name. If there is a `vX.Y.Z` tag, then the version
+     should be `X.Y.Z`.
+   - in other words, only bump version when the branch is version agnostic.
 9. Update the active `CHANGELOG.md` entry:
+   - if the current branch name contains a `vX.Y.Z` tag, then update the matching entry.
    - keep the active entry in normal changelog form
    - fill the `Compatibility` block with exact upstream dates and versions
    - add a `Breaking` section when downstream Rust code must change
@@ -93,6 +102,9 @@ preserving:
 ## Expectations
 
 - Do not leave obviously stale deprecated fields or endpoints in public structs, examples, or tests without documenting why.
+- Do not preserve removed upstream schema fields by converting them to optional
+  Rust fields or by synthesizing removed response shapes unless an explicit
+  repo-level exception is documented.
 - Do not leave `Compatibility` values as `pending` after a completed refresh
   unless an upstream source was unavailable; state the blocker explicitly.
 - Prefer aligning the crate to the current Kalshi docs rather than preserving obsolete compatibility shims indefinitely.

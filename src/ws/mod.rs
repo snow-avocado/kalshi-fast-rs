@@ -128,10 +128,15 @@
 //! using the `seq` field on [`WsDataMessageV2`] variants.
 
 mod client;
+mod event;
+mod low_level;
+pub(crate) mod reader;
+mod reconnect;
+pub(crate) mod subscription;
 pub mod types;
 
-pub use client::{
-    KalshiWsClient, KalshiWsLowLevelClient, WsEvent, WsEventReceiver, WsReaderConfig, WsReaderMode,
-    WsReconnectConfig,
-};
+pub use client::*;
+pub use event::*;
+pub use low_level::*;
+pub use reconnect::*;
 pub use types::*;

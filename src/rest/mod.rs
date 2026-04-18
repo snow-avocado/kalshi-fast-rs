@@ -57,11 +57,36 @@
 //! # }
 //! ```
 
+mod account;
 mod client;
-pub mod types;
+mod communications;
+mod events;
+mod exchange;
+mod live_data;
+mod markets;
+mod multivariate;
+mod orders;
+mod pagination;
+mod portfolio;
+mod rate_limit;
+mod retry;
+mod series;
+mod structured_targets;
+mod trades;
 
-pub use client::{
-    CursorPager, KalshiRestClient, KalshiRestClientBuilder, RateLimitConfig, RateLimitTier,
-    RetryConfig,
-};
-pub use types::*;
+pub use account::*;
+pub use client::{KalshiRestClient, KalshiRestClientBuilder};
+pub use communications::*;
+pub use events::*;
+pub use exchange::*;
+pub use live_data::*;
+pub use markets::*;
+pub use multivariate::*;
+pub use orders::*;
+pub use pagination::CursorPager;
+pub use portfolio::*;
+pub use rate_limit::{RateLimitConfig, RateLimitTier};
+pub use retry::RetryConfig;
+pub use series::*;
+pub use structured_targets::*;
+pub use trades::*;

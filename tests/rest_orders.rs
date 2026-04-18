@@ -16,7 +16,7 @@ const LIFECYCLE_TIMEOUT: Duration = Duration::from_secs(30);
 async fn test_order_lifecycle() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     // 1. Find an open market
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
@@ -140,7 +140,7 @@ async fn test_order_lifecycle() {
 async fn test_batch_order_lifecycle() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     // 1. Find an open market
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {

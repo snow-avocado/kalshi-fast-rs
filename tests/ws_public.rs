@@ -3,7 +3,7 @@
 mod common;
 
 use kalshi_fast::{
-    KalshiWsLowLevelClient, WsChannel, WsDataMessage, WsMessage, WsSubscriptionParams,
+    KalshiWsLowLevelClient, WsChannelV2, WsDataMessageV2, WsMessageV2, WsSubscriptionParamsV2,
 };
 use std::time::Duration;
 
@@ -40,8 +40,8 @@ async fn test_ws_ticker_subscribe() {
     .expect("connection failed");
 
     let sub_id = ws
-        .subscribe(WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        .subscribe_v2(WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             ..Default::default()
         })
         .await
@@ -50,14 +50,16 @@ async fn test_ws_ticker_subscribe() {
     assert!(sub_id > 0);
 
     // Read first message (should be subscribed confirmation or ticker data)
-    let msg = tokio::time::timeout(Duration::from_secs(10), async { ws.next_message().await })
-        .await
-        .expect("timeout")
-        .expect("receive failed");
+    let msg = tokio::time::timeout(Duration::from_secs(10), async {
+        ws.next_message_v2().await
+    })
+    .await
+    .expect("timeout")
+    .expect("receive failed");
 
     match msg {
-        WsMessage::Subscribed { .. } => {}
-        WsMessage::Data(WsDataMessage::Ticker { .. }) => {}
+        WsMessageV2::Subscribed { .. } => {}
+        WsMessageV2::Data(WsDataMessageV2::Ticker { .. }) => {}
         other => panic!("unexpected message: {:?}", other),
     }
 }
@@ -80,8 +82,8 @@ async fn test_ws_private_channel_requires_auth_flag() {
 
     // Subscribing to private channel on authenticated connection should succeed
     let result = ws
-        .subscribe(WsSubscriptionParams {
-            channels: vec![WsChannel::Fill],
+        .subscribe_v2(WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Fill],
             ..Default::default()
         })
         .await;
@@ -96,16 +98,16 @@ fn test_client_rejects_private_channel_without_auth() {
     // We can't actually test the unauthenticated connection since Kalshi
     // requires auth for all WebSocket connections
 
-    // Just verify that WsChannel::is_private returns true for private channels
-    assert!(WsChannel::Fill.is_private());
-    assert!(WsChannel::OrderbookDelta.is_private());
-    assert!(WsChannel::MarketPositions.is_private());
-    assert!(WsChannel::Communications.is_private());
-    assert!(WsChannel::OrderGroupUpdates.is_private());
+    // Just verify that WsChannelV2::is_private returns true for private channels
+    assert!(WsChannelV2::Fill.is_private());
+    assert!(WsChannelV2::OrderbookDelta.is_private());
+    assert!(WsChannelV2::MarketPositions.is_private());
+    assert!(WsChannelV2::Communications.is_private());
+    assert!(WsChannelV2::OrderGroupUpdates.is_private());
 
     // And false for public channels
-    assert!(!WsChannel::Ticker.is_private());
-    assert!(!WsChannel::Trade.is_private());
-    assert!(!WsChannel::MarketLifecycleV2.is_private());
-    assert!(!WsChannel::Multivariate.is_private());
+    assert!(!WsChannelV2::Ticker.is_private());
+    assert!(!WsChannelV2::Trade.is_private());
+    assert!(!WsChannelV2::MarketLifecycleV2.is_private());
+    assert!(!WsChannelV2::Multivariate.is_private());
 }

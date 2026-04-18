@@ -13,7 +13,7 @@ const LIFECYCLE_TIMEOUT: Duration = Duration::from_secs(30);
 async fn test_order_group_lifecycle() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     // 1. Create an order group
     let create_resp = tokio::time::timeout(LIFECYCLE_TIMEOUT, async {

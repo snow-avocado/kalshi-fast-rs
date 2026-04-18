@@ -12,7 +12,7 @@ use kalshi_fast::{
 
 #[tokio::test]
 async fn test_get_series_list() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_series_list(GetSeriesListParams::default()).await
     })
@@ -26,7 +26,7 @@ async fn test_get_series_list() {
 
 #[tokio::test]
 async fn test_get_series_by_ticker() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let list_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_series_list(GetSeriesListParams::default()).await
     })
@@ -51,7 +51,7 @@ async fn test_get_series_by_ticker() {
 
 #[tokio::test]
 async fn test_get_events() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_events(GetEventsParams {
@@ -70,7 +70,7 @@ async fn test_get_events() {
 
 #[tokio::test]
 async fn test_get_events_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let events = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_events_all(GetEventsParams {
@@ -92,7 +92,7 @@ async fn test_get_events_all() {
 
 #[tokio::test]
 async fn test_get_event_by_ticker() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     // First get an event ticker from the events list
     let events_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
@@ -127,7 +127,7 @@ async fn test_get_event_by_ticker() {
 
 #[tokio::test]
 async fn test_get_markets() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_markets(GetMarketsParams {
@@ -146,7 +146,7 @@ async fn test_get_markets() {
 
 #[tokio::test]
 async fn test_get_market_by_ticker() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     // First get a market ticker from the markets list
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
@@ -181,7 +181,7 @@ async fn test_get_market_by_ticker() {
 
 #[tokio::test]
 async fn test_get_market_orderbook() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -214,7 +214,7 @@ async fn test_get_market_orderbook() {
 
 #[tokio::test]
 async fn test_get_trades() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -252,7 +252,7 @@ async fn test_get_trades() {
 
 #[tokio::test]
 async fn test_get_exchange_status() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_exchange_status().await
     })
@@ -267,7 +267,7 @@ async fn test_get_exchange_status() {
 
 #[tokio::test]
 async fn test_get_exchange_announcements() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_exchange_announcements().await
     })
@@ -282,7 +282,7 @@ async fn test_get_exchange_announcements() {
 
 #[tokio::test]
 async fn test_get_exchange_schedule() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_exchange_schedule().await
     })
@@ -298,7 +298,7 @@ async fn test_get_exchange_schedule() {
 
 #[tokio::test]
 async fn test_get_user_data_timestamp() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_user_data_timestamp().await
     })
@@ -311,7 +311,7 @@ async fn test_get_user_data_timestamp() {
 
 #[tokio::test]
 async fn test_get_series_fee_changes() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_series_fee_changes(GetSeriesFeeChangesParams::default())
@@ -328,7 +328,7 @@ async fn test_get_series_fee_changes() {
 
 #[tokio::test]
 async fn test_get_multivariate_events() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_multivariate_events(GetMultivariateEventsParams {
@@ -346,7 +346,7 @@ async fn test_get_multivariate_events() {
 
 #[tokio::test]
 async fn test_get_event_metadata() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let events_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -376,7 +376,7 @@ async fn test_get_event_metadata() {
 
 #[tokio::test]
 async fn test_get_milestones() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_milestones(GetMilestonesParams {
@@ -394,7 +394,7 @@ async fn test_get_milestones() {
 
 #[tokio::test]
 async fn test_get_milestone() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let milestones_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -428,7 +428,7 @@ async fn test_get_milestone() {
 
 #[tokio::test]
 async fn test_get_multivariate_event_collections() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_multivariate_event_collections(GetMultivariateEventCollectionsParams {
@@ -446,7 +446,7 @@ async fn test_get_multivariate_event_collections() {
 
 #[tokio::test]
 async fn test_get_multivariate_event_collection() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let collections_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -479,7 +479,7 @@ async fn test_get_multivariate_event_collection() {
 
 #[tokio::test]
 async fn test_get_multivariate_event_collection_lookup_history() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let collections_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -515,7 +515,7 @@ async fn test_get_multivariate_event_collection_lookup_history() {
 
 #[tokio::test]
 async fn test_get_structured_targets() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_structured_targets(GetStructuredTargetsParams {
@@ -533,7 +533,7 @@ async fn test_get_structured_targets() {
 
 #[tokio::test]
 async fn test_get_structured_target() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let targets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -570,7 +570,7 @@ async fn test_get_structured_target() {
 
 #[tokio::test]
 async fn test_get_tags_by_categories() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_tags_by_categories().await
     })
@@ -581,7 +581,7 @@ async fn test_get_tags_by_categories() {
 
 #[tokio::test]
 async fn test_get_filters_by_sport() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_filters_by_sport().await
     })
@@ -592,7 +592,7 @@ async fn test_get_filters_by_sport() {
 
 #[tokio::test]
 async fn test_batch_get_market_candlesticks() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -634,7 +634,7 @@ async fn test_batch_get_market_candlesticks() {
 
 #[tokio::test]
 async fn test_get_market_candlesticks() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -685,7 +685,7 @@ async fn test_get_market_candlesticks() {
 
 #[tokio::test]
 async fn test_get_event_market_candlesticks() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let events_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -735,7 +735,7 @@ async fn test_get_event_market_candlesticks() {
 
 #[tokio::test]
 async fn test_get_incentive_programs() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     // May not be available on demo - just verify the endpoint doesn't panic
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -749,7 +749,7 @@ async fn test_get_incentive_programs() {
 
 #[tokio::test]
 async fn test_get_markets_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let markets = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_markets_all(GetMarketsParams {
@@ -770,7 +770,7 @@ async fn test_get_markets_all() {
 
 #[tokio::test]
 async fn test_get_trades_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -810,7 +810,7 @@ async fn test_get_trades_all() {
 
 #[tokio::test]
 async fn test_get_milestones_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let milestones = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_milestones_all(GetMilestonesParams {
@@ -830,7 +830,7 @@ async fn test_get_milestones_all() {
 
 #[tokio::test]
 async fn test_get_multivariate_events_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let events = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_multivariate_events_all(GetMultivariateEventsParams {
@@ -850,7 +850,7 @@ async fn test_get_multivariate_events_all() {
 
 #[tokio::test]
 async fn test_get_multivariate_event_collections_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let collections = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_multivariate_event_collections_all(GetMultivariateEventCollectionsParams {
@@ -870,7 +870,7 @@ async fn test_get_multivariate_event_collections_all() {
 
 #[tokio::test]
 async fn test_get_structured_targets_all() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
     let targets = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_structured_targets_all(GetStructuredTargetsParams {

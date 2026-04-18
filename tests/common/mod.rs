@@ -1,7 +1,7 @@
-use kalshi_fast::{KalshiAuth, KalshiEnvironment};
+use kalshi_fast::{KalshiAuth, KalshiEnvironment, KalshiRestClient, RateLimitConfig, RetryConfig};
 use std::time::Duration;
 
-pub const TEST_TIMEOUT: Duration = Duration::from_secs(10);
+pub const TEST_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[allow(dead_code)]
 pub fn load_env() {
@@ -27,4 +27,39 @@ pub fn load_auth() -> KalshiAuth {
 
 pub fn demo_env() -> KalshiEnvironment {
     KalshiEnvironment::demo()
+}
+
+pub fn demo_client() -> KalshiRestClient {
+    KalshiRestClient::builder(demo_env())
+        .with_rate_limit_config(RateLimitConfig {
+            read_rps: 4,
+            write_rps: 2,
+        })
+        .with_retry_config(RetryConfig {
+            max_retries: 5,
+            base_delay: Duration::from_millis(500),
+            max_delay: Duration::from_secs(6),
+            jitter: 0.0,
+            retry_non_idempotent: false,
+        })
+        .build()
+        .expect("build live test client")
+}
+
+pub fn demo_auth_client(auth: KalshiAuth) -> KalshiRestClient {
+    KalshiRestClient::builder(demo_env())
+        .with_auth(auth)
+        .with_rate_limit_config(RateLimitConfig {
+            read_rps: 4,
+            write_rps: 2,
+        })
+        .with_retry_config(RetryConfig {
+            max_retries: 5,
+            base_delay: Duration::from_millis(500),
+            max_delay: Duration::from_secs(6),
+            jitter: 0.0,
+            retry_non_idempotent: false,
+        })
+        .build()
+        .expect("build authenticated live test client")
 }

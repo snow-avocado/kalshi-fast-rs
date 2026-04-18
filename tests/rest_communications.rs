@@ -13,7 +13,7 @@ const LIFECYCLE_TIMEOUT: Duration = Duration::from_secs(30);
 async fn test_rfq_lifecycle() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     // Find an open market
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
@@ -81,7 +81,7 @@ async fn test_rfq_lifecycle() {
 async fn test_quote_lifecycle() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     // Find an open market
     let markets_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {

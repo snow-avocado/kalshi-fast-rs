@@ -13,7 +13,7 @@ use kalshi_fast::{
 async fn test_get_balance() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async { client.get_balance().await })
         .await
@@ -30,7 +30,7 @@ async fn test_get_balance() {
 async fn test_get_positions() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -52,7 +52,7 @@ async fn test_get_positions() {
 async fn test_get_orders() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -74,7 +74,7 @@ async fn test_get_orders() {
 async fn test_get_fills() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -95,7 +95,7 @@ async fn test_get_fills() {
 async fn test_get_settlements() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -116,7 +116,7 @@ async fn test_get_settlements() {
 async fn test_get_account_api_limits() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_account_api_limits().await
@@ -133,7 +133,7 @@ async fn test_get_account_api_limits() {
 async fn test_get_subaccount_balances() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_subaccount_balances().await
@@ -151,7 +151,7 @@ async fn test_get_subaccount_balances() {
 async fn test_get_subaccount_transfers() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -170,7 +170,7 @@ async fn test_get_subaccount_transfers() {
 
 #[tokio::test]
 async fn test_auth_required_without_auth() {
-    let client = KalshiRestClient::new(common::demo_env());
+    let client = common::demo_client();
 
     let result =
         tokio::time::timeout(common::TEST_TIMEOUT, async { client.get_balance().await }).await;
@@ -189,7 +189,7 @@ async fn test_auth_required_without_auth() {
 async fn test_get_portfolio_total_resting_order_value() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_portfolio_total_resting_order_value().await
@@ -205,7 +205,7 @@ async fn test_get_portfolio_total_resting_order_value() {
 async fn test_get_api_keys() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async { client.get_api_keys().await })
         .await
@@ -217,7 +217,7 @@ async fn test_get_api_keys() {
 async fn test_get_communications_id() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_communications_id().await
@@ -233,7 +233,7 @@ async fn test_get_communications_id() {
 async fn test_get_order_groups() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -249,7 +249,7 @@ async fn test_get_order_groups() {
 async fn test_get_order_queue_positions() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -265,7 +265,7 @@ async fn test_get_order_queue_positions() {
 async fn test_get_rfqs() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_rfqs(GetRFQsParams::default()).await
@@ -282,7 +282,7 @@ async fn test_get_rfqs() {
 async fn test_get_quotes() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_quotes(GetQuotesParams::default()).await
@@ -299,7 +299,7 @@ async fn test_get_quotes() {
 async fn test_get_event_forecast_percentile_history() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     // First find an open event with a series_ticker
     let events_resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
@@ -355,7 +355,7 @@ async fn test_get_event_forecast_percentile_history() {
 async fn test_get_subaccount_transfers_all() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let transfers = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
@@ -377,7 +377,7 @@ async fn test_get_subaccount_transfers_all() {
 async fn test_get_rfqs_all() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let rfqs = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_rfqs_all(GetRFQsParams::default()).await
@@ -393,7 +393,7 @@ async fn test_get_rfqs_all() {
 async fn test_get_quotes_all() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let quotes = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_quotes_all(GetQuotesParams::default()).await
@@ -409,7 +409,7 @@ async fn test_get_quotes_all() {
 async fn test_get_subaccount_netting() {
     common::load_env();
     let auth = common::load_auth();
-    let client = KalshiRestClient::new(common::demo_env()).with_auth(auth);
+    let client = common::demo_auth_client(auth);
 
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_subaccount_netting().await

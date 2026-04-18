@@ -1,8 +1,8 @@
 //! Unit tests for WebSocket message parsing.
 
 use kalshi_fast::{
-    WsCommunications, WsDataMessage, WsEnvelope, WsMarketLifecycleEventType, WsMessage, WsMsgType,
-    WsOrderGroupEventType, WsOrderbookDelta, WsTicker, YesNo,
+    WsCommunications, WsDataMessageV2, WsEnvelope, WsMarketLifecycleEventType, WsMessageV2,
+    WsMsgType, WsOrderGroupEventType, WsOrderbookDelta, WsTicker, YesNo,
 };
 use serde_json::Value;
 
@@ -35,7 +35,7 @@ fn ws_message_subscribed_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Subscribed { id, sid } => {
+        WsMessageV2::Subscribed { id, sid } => {
             assert_eq!(id, Some(5));
             assert_eq!(sid, Some(99));
         }
@@ -57,7 +57,7 @@ fn ws_message_subscribed_parses_sid_from_msg() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Subscribed { id, sid } => {
+        WsMessageV2::Subscribed { id, sid } => {
             assert_eq!(id, Some(6));
             assert_eq!(sid, Some(321));
         }
@@ -80,7 +80,7 @@ fn ws_message_list_subscriptions_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::ListSubscriptions { id, subscriptions } => {
+        WsMessageV2::ListSubscriptions { id, subscriptions } => {
             assert_eq!(id, Some(7));
             assert_eq!(subscriptions.len(), 1);
             assert_eq!(subscriptions[0].sid, 1);
@@ -104,18 +104,18 @@ fn ws_message_list_subscriptions_parses_from_ok_msg_array() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::ListSubscriptions { id, subscriptions } => {
+        WsMessageV2::ListSubscriptions { id, subscriptions } => {
             assert_eq!(id, Some(8));
             assert_eq!(subscriptions.len(), 2);
             assert_eq!(subscriptions[0].sid, 11);
             assert_eq!(
                 subscriptions[0].channel,
-                Some(kalshi_fast::WsChannel::Ticker)
+                Some(kalshi_fast::WsChannelV2::Ticker)
             );
             assert_eq!(subscriptions[1].sid, 12);
             assert_eq!(
                 subscriptions[1].channel,
-                Some(kalshi_fast::WsChannel::Trade)
+                Some(kalshi_fast::WsChannelV2::Trade)
             );
         }
         other => panic!("unexpected: {:?}", other),
@@ -133,7 +133,7 @@ fn ws_message_error_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Error { id, error } => {
+        WsMessageV2::Error { id, error } => {
             assert_eq!(id, Some(9));
             assert_eq!(error.code, Some(9));
             assert_eq!(error.message.as_deref(), Some("Authentication required"));
@@ -149,28 +149,29 @@ fn ws_ticker_message_parses() {
         "msg": {
             "market_ticker": "INXD-25JAN10-T17900",
             "market_id": "abc123",
-            "price": 55,
-            "yes_bid": 54,
-            "yes_ask": 56,
             "price_dollars": "0.55",
             "yes_bid_dollars": "0.54",
             "yes_ask_dollars": "0.56",
-            "volume": 10000,
+            "yes_bid_size_fp": "10.00",
+            "yes_ask_size_fp": "12.00",
+            "last_trade_size_fp": "2.00",
             "volume_fp": "10000.00",
-            "open_interest": 5000,
             "open_interest_fp": "5000.00",
             "dollar_volume": 5500,
             "dollar_open_interest": 2750,
-            "ts": 1700000000000
+            "ts": 1700000000,
+            "ts_ms": 1700000000000,
+            "time": "2025-01-10T12:00:00Z"
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Ticker { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::Ticker { msg, .. }) => {
             assert_eq!(msg.market_ticker, "INXD-25JAN10-T17900");
-            assert_eq!(msg.price, 55);
+            assert_eq!(msg.price_dollars, "0.55");
+            assert_eq!(msg.yes_bid_size_fp, "10.00");
         }
         other => panic!("unexpected: {:?}", other),
     }
@@ -182,20 +183,23 @@ fn ws_trade_message_parses() {
         "type": "trade",
         "msg": {
             "trade_id": "trade-1",
-            "ticker": "MKT-1",
-            "price": 55,
-            "count": 10,
+            "market_ticker": "MKT-1",
+            "yes_price_dollars": "0.55",
+            "no_price_dollars": "0.45",
+            "count_fp": "10.00",
             "taker_side": "yes",
-            "created_time": "2025-01-10T12:00:00Z"
+            "ts": 1700000000,
+            "ts_ms": 1700000000000
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Trade { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::Trade { msg, .. }) => {
             assert_eq!(msg.trade_id, "trade-1");
-            assert_eq!(msg.ticker, "MKT-1");
+            assert_eq!(msg.market_ticker, "MKT-1");
+            assert_eq!(msg.count_fp, "10.00");
         }
         other => panic!("unexpected: {:?}", other),
     }
@@ -218,7 +222,7 @@ fn ws_orderbook_snapshot_deserializes() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::OrderbookSnapshot { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot { msg, .. }) => {
             assert_eq!(msg.market_ticker, "INXD-25JAN10-T17900");
             assert_eq!(msg.yes.len(), 2);
         }
@@ -233,23 +237,23 @@ fn ws_orderbook_delta_deserializes() {
         "msg": {
             "market_ticker": "INXD-25JAN10-T17900",
             "market_id": "abc123",
-            "price": 55,
             "price_dollars": "0.55",
-            "delta": 50,
             "delta_fp": "50.00",
             "side": "yes",
             "client_order_id": "my-order-1",
             "subaccount": 0,
-            "ts": "2025-01-10T12:00:00Z"
+            "ts": "2025-01-10T12:00:00Z",
+            "ts_ms": 1700000000000
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::OrderbookDelta { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::OrderbookDelta { msg, .. }) => {
             assert_eq!(msg.market_ticker, "INXD-25JAN10-T17900");
-            assert_eq!(msg.delta, 50);
+            assert_eq!(msg.delta_fp, "50.00");
+            assert_eq!(msg.ts_ms, Some(1700000000000));
         }
         other => panic!("unexpected: {:?}", other),
     }
@@ -260,34 +264,31 @@ fn ws_fill_deserializes() {
     let json = r#"{
         "type": "fill",
         "msg": {
-            "fill_id": "fill-123",
             "trade_id": "trade-456",
             "order_id": "order-789",
             "client_order_id": "my-order",
-            "ticker": "INXD-25JAN10-T17900",
             "market_ticker": "INXD-25JAN10-T17900",
             "side": "yes",
             "action": "buy",
-            "count": 10,
             "count_fp": "10.00",
-            "yes_price": 55,
-            "no_price": 45,
-            "yes_price_fixed": "0.55",
-            "no_price_fixed": "0.45",
+            "yes_price_dollars": "0.55",
             "is_taker": true,
             "fee_cost": "0.05",
-            "created_time": "2025-01-10T12:00:00Z",
-            "subaccount_number": 1,
-            "ts": 1700000000000
+            "ts": 1700000000,
+            "ts_ms": 1700000000000,
+            "post_position_fp": "15.00",
+            "purchased_side": "yes",
+            "subaccount": 1
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Fill { msg, .. }) => {
-            assert_eq!(msg.fill_id, "fill-123");
+        WsMessageV2::Data(WsDataMessageV2::Fill { msg, .. }) => {
             assert_eq!(msg.trade_id, "trade-456");
+            assert_eq!(msg.market_ticker, "INXD-25JAN10-T17900");
+            assert_eq!(msg.post_position_fp, "15.00");
         }
         other => panic!("unexpected: {:?}", other),
     }
@@ -301,19 +302,19 @@ fn ws_envelope_parse_ticker_raw() {
         "msg": {
             "market_ticker": "TEST",
             "market_id": "abc",
-            "price": 50,
-            "yes_bid": 49,
-            "yes_ask": 51,
             "price_dollars": "0.50",
             "yes_bid_dollars": "0.49",
             "yes_ask_dollars": "0.51",
-            "volume": 1000,
+            "yes_bid_size_fp": "2.00",
+            "yes_ask_size_fp": "3.00",
+            "last_trade_size_fp": "1.00",
             "volume_fp": "1000.00",
-            "open_interest": 500,
             "open_interest_fp": "500.00",
             "dollar_volume": 500,
             "dollar_open_interest": 250,
-            "ts": 1700000000
+            "ts": 1700000000,
+            "ts_ms": 1700000000000,
+            "time": "2025-01-10T12:00:00Z"
         }
     }"#;
 
@@ -330,18 +331,17 @@ fn ws_orderbook_delta_raw() {
         "msg": {
             "market_ticker": "TEST",
             "market_id": "abc",
-            "price": 50,
             "price_dollars": "0.50",
-            "delta": 10,
             "delta_fp": "10.00",
-            "side": "yes"
+            "side": "yes",
+            "ts_ms": 1700000000000
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let raw = env.msg_raw().unwrap();
     let msg: WsOrderbookDelta = serde_json::from_str(raw).unwrap();
-    assert_eq!(msg.delta, 10);
+    assert_eq!(msg.delta_fp, "10.00");
 }
 
 #[test]
@@ -366,7 +366,7 @@ fn ws_market_lifecycle_v2_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::MarketLifecycleV2 { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::MarketLifecycleV2 { msg, .. }) => {
             assert_eq!(msg.market_ticker, "MKT-1");
             assert_eq!(msg.event_type, Some(WsMarketLifecycleEventType::Created));
             assert_eq!(msg.open_ts, Some(1700000000));
@@ -405,7 +405,7 @@ fn ws_event_lifecycle_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::EventLifecycle { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::EventLifecycle { msg, .. }) => {
             assert_eq!(msg.event_ticker, "EVT-1");
             assert_eq!(msg.title.as_deref(), Some("Event title"));
             assert_eq!(msg.subtitle.as_deref(), Some("Event subtitle"));
@@ -437,7 +437,7 @@ fn ws_event_lifecycle_v2_alias_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::EventLifecycle { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::EventLifecycle { msg, .. }) => {
             assert_eq!(msg.event_ticker, "EVT-ALIAS");
         }
         other => panic!("unexpected: {:?}", other),
@@ -447,20 +447,25 @@ fn ws_event_lifecycle_v2_alias_parses() {
 #[test]
 fn ws_market_positions_message_parses() {
     let json = r#"{
-        "type": "market_positions",
+        "type": "market_position",
         "msg": {
-            "market_positions": [{"ticker":"MKT-1","position":1}],
-            "event_positions": [{"event_ticker":"EVT-1","position":2}]
+            "user_id": "user-1",
+            "market_ticker": "MKT-1",
+            "position_fp": "1.00",
+            "position_cost_dollars": "0.52",
+            "realized_pnl_dollars": "0.10",
+            "fees_paid_dollars": "0.01",
+            "position_fee_cost_dollars": "0.02",
+            "volume_fp": "10.00"
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::MarketPositions { msg, .. }) => {
-            assert_eq!(msg.market_positions.len(), 1);
-            assert_eq!(msg.market_positions[0].ticker, "MKT-1");
-            assert_eq!(msg.event_positions[0].event_ticker, "EVT-1");
+        WsMessageV2::Data(WsDataMessageV2::MarketPosition { msg, .. }) => {
+            assert_eq!(msg.market_ticker, "MKT-1");
+            assert_eq!(msg.position_fp, "1.00");
         }
         other => panic!("unexpected: {:?}", other),
     }
@@ -484,7 +489,7 @@ fn ws_rfq_created_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Communications { msg, .. }) => match msg {
+        WsMessageV2::Data(WsDataMessageV2::Communications { msg, .. }) => match msg {
             WsCommunications::RfqCreated(rfq) => {
                 assert_eq!(rfq.id, "rfq_123");
                 assert_eq!(rfq.market_ticker, "FED-23DEC-T3.00");
@@ -514,7 +519,7 @@ fn ws_rfq_deleted_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Communications { msg, .. }) => match msg {
+        WsMessageV2::Data(WsDataMessageV2::Communications { msg, .. }) => match msg {
             WsCommunications::RfqDeleted(rfq) => {
                 assert_eq!(rfq.id, "rfq_124");
                 assert_eq!(rfq.creator_id, "creator");
@@ -545,7 +550,7 @@ fn ws_quote_created_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Communications { msg, .. }) => match msg {
+        WsMessageV2::Data(WsDataMessageV2::Communications { msg, .. }) => match msg {
             WsCommunications::QuoteCreated(quote) => {
                 assert_eq!(quote.quote_id, "q-1");
                 assert_eq!(quote.yes_bid, 50);
@@ -577,7 +582,7 @@ fn ws_quote_accepted_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Communications { msg, .. }) => match msg {
+        WsMessageV2::Data(WsDataMessageV2::Communications { msg, .. }) => match msg {
             WsCommunications::QuoteAccepted(quote) => {
                 assert_eq!(quote.quote_id, "q-2");
                 assert!(matches!(quote.accepted_side, Some(YesNo::Yes)));
@@ -608,7 +613,7 @@ fn ws_quote_executed_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Communications { msg, .. }) => match msg {
+        WsMessageV2::Data(WsDataMessageV2::Communications { msg, .. }) => match msg {
             WsCommunications::QuoteExecuted(quote) => {
                 assert_eq!(quote.quote_id, "q-3");
                 assert_eq!(quote.order_id, "order-1");
@@ -636,7 +641,7 @@ fn ws_multivariate_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::Multivariate { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::Multivariate { msg, .. }) => {
             assert_eq!(msg.collection_ticker, "COLL-1");
             assert!(matches!(msg.selected_markets[0].side, YesNo::Yes));
         }
@@ -654,7 +659,7 @@ fn ws_order_group_updates_message_parses() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::OrderGroupUpdates { msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::OrderGroupUpdates { msg, .. }) => {
             assert_eq!(msg.order_group_id, "og-1");
             assert!(matches!(
                 msg.event_type,
@@ -677,23 +682,28 @@ fn ws_user_order_message_parses() {
             "ticker": "INXD-26FEB14-T19000",
             "status": "resting",
             "side": "yes",
+            "is_yes": true,
             "yes_price_dollars": "0.5500",
             "fill_count_fp": "0.00",
             "remaining_count_fp": "10.00",
             "initial_count_fp": "10.00",
             "taker_fill_cost_dollars": "0.0000",
             "maker_fill_cost_dollars": "0.0000",
+            "taker_fees_dollars": "0.0000",
+            "maker_fees_dollars": "0.0000",
             "client_order_id": "abc-123",
-            "created_time": "2026-02-14T12:00:00Z"
+            "created_time": "2026-02-14T12:00:00Z",
+            "created_ts_ms": 1771070400000
         }
     }"#;
 
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::Data(WsDataMessage::UserOrder { sid, msg, .. }) => {
+        WsMessageV2::Data(WsDataMessageV2::UserOrder { sid, msg, .. }) => {
             assert_eq!(sid, Some(2));
             assert_eq!(msg.ticker, "INXD-26FEB14-T19000");
+            assert_eq!(msg.is_yes, Some(true));
             assert_eq!(msg.yes_price_dollars.as_deref(), Some("0.5500"));
             assert_eq!(msg.remaining_count_fp.as_deref(), Some("10.00"));
         }
@@ -714,7 +724,7 @@ fn ws_list_subscriptions_parses_from_subscriptions_field() {
     let env: WsEnvelope = serde_json::from_str(json).unwrap();
     let msg = env.into_message().unwrap();
     match msg {
-        WsMessage::ListSubscriptions { id, subscriptions } => {
+        WsMessageV2::ListSubscriptions { id, subscriptions } => {
             assert_eq!(id, Some(2));
             assert_eq!(subscriptions.len(), 1);
             assert_eq!(subscriptions[0].sid, 10);

@@ -198,6 +198,7 @@ pub mod env;
 pub mod error;
 pub mod rest;
 pub mod types;
+pub mod utils;
 pub mod ws;
 
 // Primary clients
@@ -206,4 +207,5 @@ pub use env::{KalshiEnvironment, REST_PREFIX, WS_PATH};
 pub use error::KalshiError;
 pub use rest::*;
 pub use types::*;
+pub use utils::*;
 pub use ws::*;

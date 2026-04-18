@@ -8,8 +8,8 @@
 /// Requires KALSHI_KEY_ID and KALSHI_PRIVATE_KEY_PATH env vars (or .env file)
 use kalshi_fast::{
     GetMarketsParams, KalshiAuth, KalshiEnvironment, KalshiRestClient, KalshiWsClient, Market,
-    MarketStatusQuery, MveFilter, WsDataMessage, WsEvent, WsMessage, WsReconnectConfig,
-    WsSubscriptionParams,
+    MarketStatusQuery, MveFilter, WsDataMessageV2, WsEvent, WsMessageV2, WsReconnectConfig,
+    WsSubscriptionParamsV2,
 };
 use std::time::Duration;
 use tokio::time::sleep;
@@ -118,8 +118,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Step 4: Subscribe to orderbook deltas
     let sub_id = ws
-        .subscribe(WsSubscriptionParams {
-            channels: vec![kalshi_fast::WsChannel::OrderbookDelta],
+        .subscribe_v2(WsSubscriptionParamsV2 {
+            channels: vec![kalshi_fast::WsChannelV2::OrderbookDelta],
             market_tickers: Some(market_tickers),
             ..Default::default()
         })
@@ -129,9 +129,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Step 5: Stream updates
     loop {
-        match ws.next_event().await? {
+        match ws.next_event_v2().await? {
             WsEvent::Message(msg) => match msg {
-                WsMessage::Data(WsDataMessage::OrderbookSnapshot { msg, seq, .. }) => {
+                WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot { msg, seq, .. }) => {
                     println!(
                         "[SNAPSHOT] {} | yes={} no={} | seq={:?}",
                         msg.market_ticker,
@@ -140,14 +140,14 @@ async fn main() -> anyhow::Result<()> {
                         seq
                     );
                 }
-                WsMessage::Data(WsDataMessage::OrderbookDelta { msg, seq, .. }) => {
+                WsMessageV2::Data(WsDataMessageV2::OrderbookDelta { msg, seq, .. }) => {
                     println!(
                         "[DELTA] {} | {}@{} {:+} | seq={:?}",
-                        msg.market_ticker, msg.side, msg.price, msg.delta, seq
+                        msg.market_ticker, msg.side, msg.price_dollars, msg.delta_fp, seq
                     );
                 }
-                WsMessage::Subscribed { sid, .. } => println!("[SUBSCRIBED] sid={:?}", sid),
-                WsMessage::Error { error, .. } => println!("[ERROR] {:?}", error),
+                WsMessageV2::Subscribed { sid, .. } => println!("[SUBSCRIBED] sid={:?}", sid),
+                WsMessageV2::Error { error, .. } => println!("[ERROR] {:?}", error),
                 other => println!("[OTHER] {:?}", other),
             },
             WsEvent::Raw(_) => {}

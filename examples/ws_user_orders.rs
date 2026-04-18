@@ -1,6 +1,7 @@
 use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannel, WsDataMessage, WsEvent, WsMessage,
-    WsReconnectConfig, WsSubscriptionParams, WsUpdateAction, WsUpdateSubscriptionParams,
+    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2, WsDataMessageV2, WsEvent,
+    WsMessageV2, WsReconnectConfig, WsSubscriptionParamsV2, WsUpdateAction,
+    WsUpdateSubscriptionParamsV2,
 };
 
 #[tokio::main]
@@ -17,15 +18,15 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     let sub_cmd_id = ws
-        .subscribe(WsSubscriptionParams {
-            channels: vec![WsChannel::UserOrders],
+        .subscribe_v2(WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::UserOrders],
             ..Default::default()
         })
         .await?;
 
-    while let Ok(event) = ws.next_event().await {
+    while let Ok(event) = ws.next_event_v2().await {
         match event {
-            WsEvent::Message(WsMessage::Subscribed {
+            WsEvent::Message(WsMessageV2::Subscribed {
                 id: Some(id),
                 sid: Some(subscription_id),
             }) if id == sub_cmd_id => {
@@ -33,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
                 // Update action example (for channels supporting market filters).
                 let _ = ws
-                    .update_subscription(WsUpdateSubscriptionParams {
+                    .update_subscription_v2(WsUpdateSubscriptionParamsV2 {
                         action: WsUpdateAction::AddMarkets,
                         sid: Some(subscription_id),
                         sids: None,
@@ -42,10 +43,11 @@ async fn main() -> anyhow::Result<()> {
                         market_id: None,
                         market_ids: None,
                         send_initial_snapshot: None,
+                        skip_ticker_ack: None,
                     })
                     .await;
             }
-            WsEvent::Message(WsMessage::Data(WsDataMessage::UserOrder { msg, .. })) => {
+            WsEvent::Message(WsMessageV2::Data(WsDataMessageV2::UserOrder { msg, .. })) => {
                 println!(
                     "order={} ticker={} status={:?}",
                     msg.order_id, msg.ticker, msg.status

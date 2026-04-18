@@ -16,11 +16,12 @@ use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum WsChannel {
+pub enum WsChannelV2 {
     // Public (no auth required)
     Ticker,
     Trade,
     MarketLifecycleV2,
+    MultivariateMarketLifecycle,
     Multivariate,
 
     // Private (auth required)
@@ -32,36 +33,37 @@ pub enum WsChannel {
     UserOrders,
 }
 
-impl WsChannel {
+impl WsChannelV2 {
     pub fn as_str(self) -> &'static str {
         match self {
-            WsChannel::Ticker => "ticker",
-            WsChannel::Trade => "trade",
-            WsChannel::MarketLifecycleV2 => "market_lifecycle_v2",
-            WsChannel::Multivariate => "multivariate",
-            WsChannel::OrderbookDelta => "orderbook_delta",
-            WsChannel::Fill => "fill",
-            WsChannel::MarketPositions => "market_positions",
-            WsChannel::Communications => "communications",
-            WsChannel::OrderGroupUpdates => "order_group_updates",
-            WsChannel::UserOrders => "user_orders",
+            WsChannelV2::Ticker => "ticker",
+            WsChannelV2::Trade => "trade",
+            WsChannelV2::MarketLifecycleV2 => "market_lifecycle_v2",
+            WsChannelV2::MultivariateMarketLifecycle => "multivariate_market_lifecycle",
+            WsChannelV2::Multivariate => "multivariate",
+            WsChannelV2::OrderbookDelta => "orderbook_delta",
+            WsChannelV2::Fill => "fill",
+            WsChannelV2::MarketPositions => "market_positions",
+            WsChannelV2::Communications => "communications",
+            WsChannelV2::OrderGroupUpdates => "order_group_updates",
+            WsChannelV2::UserOrders => "user_orders",
         }
     }
 
     pub fn is_private(self) -> bool {
         matches!(
             self,
-            WsChannel::OrderbookDelta
-                | WsChannel::Fill
-                | WsChannel::MarketPositions
-                | WsChannel::Communications
-                | WsChannel::OrderGroupUpdates
-                | WsChannel::UserOrders
+            WsChannelV2::OrderbookDelta
+                | WsChannelV2::Fill
+                | WsChannelV2::MarketPositions
+                | WsChannelV2::Communications
+                | WsChannelV2::OrderGroupUpdates
+                | WsChannelV2::UserOrders
         )
     }
 }
 
-impl fmt::Display for WsChannel {
+impl fmt::Display for WsChannelV2 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
@@ -79,8 +81,9 @@ pub enum WsMsgType {
     OrderbookSnapshot,
     OrderbookDelta,
     Fill,
-    MarketPositions,
+    MarketPosition,
     MarketLifecycleV2,
+    MultivariateMarketLifecycle,
     EventLifecycle,
     Multivariate,
     MultivariateLookup,
@@ -108,8 +111,9 @@ impl WsMsgType {
             WsMsgType::OrderbookSnapshot => "orderbook_snapshot",
             WsMsgType::OrderbookDelta => "orderbook_delta",
             WsMsgType::Fill => "fill",
-            WsMsgType::MarketPositions => "market_positions",
+            WsMsgType::MarketPosition => "market_position",
             WsMsgType::MarketLifecycleV2 => "market_lifecycle_v2",
+            WsMsgType::MultivariateMarketLifecycle => "multivariate_market_lifecycle",
             WsMsgType::EventLifecycle => "event_lifecycle",
             WsMsgType::Multivariate => "multivariate",
             WsMsgType::MultivariateLookup => "multivariate_lookup",
@@ -137,8 +141,9 @@ impl WsMsgType {
             "orderbook_snapshot" => WsMsgType::OrderbookSnapshot,
             "orderbook_delta" => WsMsgType::OrderbookDelta,
             "fill" => WsMsgType::Fill,
-            "market_positions" => WsMsgType::MarketPositions,
+            "market_position" | "market_positions" => WsMsgType::MarketPosition,
             "market_lifecycle_v2" => WsMsgType::MarketLifecycleV2,
+            "multivariate_market_lifecycle" => WsMsgType::MultivariateMarketLifecycle,
             "event_lifecycle" | "event_lifecycle_v2" => WsMsgType::EventLifecycle,
             "multivariate" => WsMsgType::Multivariate,
             "multivariate_lookup" => WsMsgType::MultivariateLookup,
@@ -166,8 +171,9 @@ impl WsMsgType {
             "orderbook_snapshot" => WsMsgType::OrderbookSnapshot,
             "orderbook_delta" => WsMsgType::OrderbookDelta,
             "fill" => WsMsgType::Fill,
-            "market_positions" => WsMsgType::MarketPositions,
+            "market_position" | "market_positions" => WsMsgType::MarketPosition,
             "market_lifecycle_v2" => WsMsgType::MarketLifecycleV2,
+            "multivariate_market_lifecycle" => WsMsgType::MultivariateMarketLifecycle,
             "event_lifecycle" | "event_lifecycle_v2" => WsMsgType::EventLifecycle,
             "multivariate" => WsMsgType::Multivariate,
             "multivariate_lookup" => WsMsgType::MultivariateLookup,
@@ -231,8 +237,8 @@ impl<'de> Deserialize<'de> for WsMsgType {
 
 /// Subscription parameters for WebSocket channels.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct WsSubscriptionParams {
-    pub channels: Vec<WsChannel>,
+pub struct WsSubscriptionParamsV2 {
+    pub channels: Vec<WsChannelV2>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub market_ticker: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -253,7 +259,7 @@ pub struct WsSubscriptionParams {
     pub shard_key: Option<u32>,
 }
 
-impl WsSubscriptionParams {
+impl WsSubscriptionParamsV2 {
     /// Collect all market tickers from both singular and plural fields.
     pub fn all_market_tickers(&self) -> Vec<&str> {
         let mut out = Vec::new();
@@ -283,9 +289,9 @@ impl WsSubscriptionParams {
 pub struct WsSubscriptionInfo {
     pub sid: u64,
     #[serde(default)]
-    pub channels: Vec<WsChannel>,
+    pub channels: Vec<WsChannelV2>,
     #[serde(default)]
-    pub channel: Option<WsChannel>,
+    pub channel: Option<WsChannelV2>,
     #[serde(default)]
     pub market_tickers: Option<Vec<String>>,
     #[serde(default)]
@@ -294,6 +300,8 @@ pub struct WsSubscriptionInfo {
     pub event_tickers: Option<Vec<String>>,
     #[serde(default)]
     pub send_initial_snapshot: Option<bool>,
+    #[serde(default)]
+    pub skip_ticker_ack: Option<bool>,
     #[serde(default)]
     pub shard_factor: Option<u32>,
     #[serde(default)]
@@ -305,42 +313,51 @@ pub struct WsSubscriptionInfo {
 pub struct WsTicker {
     pub market_ticker: String,
     pub market_id: String,
+    #[serde(default)]
     pub price: i64,
+    #[serde(default)]
     pub yes_bid: i64,
+    #[serde(default)]
     pub yes_ask: i64,
     pub price_dollars: String,
     pub yes_bid_dollars: String,
     pub yes_ask_dollars: String,
+    pub yes_bid_size_fp: String,
+    pub yes_ask_size_fp: String,
+    pub last_trade_size_fp: String,
+    #[serde(default)]
     pub volume: i64,
     pub volume_fp: String,
+    #[serde(default)]
     pub open_interest: i64,
     pub open_interest_fp: String,
     pub dollar_volume: i64,
     pub dollar_open_interest: i64,
     pub ts: i64,
+    pub ts_ms: i64,
+    pub time: String,
 }
 
 /// Trade channel message (type: "trade")
 #[derive(Debug, Clone, Deserialize)]
 pub struct WsTrade {
     pub trade_id: String,
-    pub ticker: String,
+    #[serde(alias = "ticker")]
+    pub market_ticker: String,
     #[serde(default)]
     pub price: Option<i64>,
     #[serde(default)]
     pub count: Option<i64>,
-    #[serde(default)]
-    pub count_fp: Option<String>,
+    pub count_fp: String,
     #[serde(default)]
     pub yes_price: Option<i64>,
     #[serde(default)]
     pub no_price: Option<i64>,
-    #[serde(default)]
-    pub yes_price_dollars: Option<String>,
-    #[serde(default)]
-    pub no_price_dollars: Option<String>,
-    #[serde(default)]
-    pub taker_side: Option<TradeTakerSide>,
+    pub yes_price_dollars: String,
+    pub no_price_dollars: String,
+    pub taker_side: TradeTakerSide,
+    pub ts: i64,
+    pub ts_ms: i64,
     #[serde(default)]
     pub created_time: Option<String>,
 }
@@ -375,8 +392,10 @@ pub struct WsOrderbookSnapshot {
 pub struct WsOrderbookDelta {
     pub market_ticker: String,
     pub market_id: String,
+    #[serde(default)]
     pub price: i64,
     pub price_dollars: String,
+    #[serde(default)]
     pub delta: i64,
     pub delta_fp: String,
     pub side: YesNo,
@@ -386,36 +405,43 @@ pub struct WsOrderbookDelta {
     pub subaccount: Option<i64>,
     #[serde(default)]
     pub ts: Option<String>,
+    #[serde(default)]
+    pub ts_ms: Option<i64>,
 }
 
 /// Fill channel message (type: "fill")
 #[derive(Debug, Clone, Deserialize)]
 pub struct WsFill {
-    pub fill_id: String,
     pub trade_id: String,
     pub order_id: String,
     #[serde(default)]
     pub client_order_id: Option<String>,
-    pub ticker: String,
+    #[serde(alias = "ticker")]
     pub market_ticker: String,
     pub side: YesNo,
     pub action: BuySell,
+    #[serde(default)]
     pub count: i64,
     pub count_fp: String,
+    #[serde(default)]
     pub yes_price: i64,
+    #[serde(default)]
     pub no_price: i64,
-    #[serde(alias = "yes_price_dollars")]
-    pub yes_price_fixed: String,
-    #[serde(alias = "no_price_dollars")]
-    pub no_price_fixed: String,
+    #[serde(alias = "yes_price_fixed")]
+    pub yes_price_dollars: String,
+    #[serde(default, alias = "no_price_fixed")]
+    pub no_price_dollars: Option<String>,
     pub is_taker: bool,
     pub fee_cost: String,
+    pub ts: i64,
+    pub ts_ms: i64,
+    pub post_position_fp: String,
+    pub purchased_side: YesNo,
     #[serde(default)]
     pub created_time: Option<String>,
     #[serde(default)]
-    pub subaccount_number: Option<i64>,
-    #[serde(default)]
-    pub ts: Option<i64>,
+    #[serde(alias = "subaccount_number")]
+    pub subaccount: Option<i64>,
 }
 
 /// Market lifecycle message (type: "market_lifecycle_v2")
@@ -429,6 +455,20 @@ pub struct WsMarketLifecycleV2 {
     #[serde(default)]
     pub close_ts: Option<i64>,
     #[serde(default)]
+    pub result: Option<String>,
+    #[serde(default)]
+    pub determination_ts: Option<i64>,
+    #[serde(default)]
+    pub settlement_value: Option<String>,
+    #[serde(default)]
+    pub settled_ts: Option<i64>,
+    #[serde(default)]
+    pub is_deactivated: Option<bool>,
+    #[serde(default)]
+    pub fractional_trading_enabled: Option<bool>,
+    #[serde(default)]
+    pub price_level_structure: Option<String>,
+    #[serde(default)]
     pub additional_metadata: Option<WsMarketLifecycleAdditionalMetadata>,
 }
 
@@ -441,6 +481,8 @@ pub enum WsMarketLifecycleEventType {
     CloseDateUpdated,
     Determined,
     Settled,
+    FractionalTradingUpdated,
+    PriceLevelStructureUpdated,
     #[serde(other)]
     Unknown,
 }
@@ -468,7 +510,9 @@ pub struct WsMarketLifecycleAdditionalMetadata {
     #[serde(default)]
     pub strike_type: Option<String>,
     #[serde(default)]
-    pub floor_strike: Option<i64>,
+    pub floor_strike: Option<f64>,
+    #[serde(default)]
+    pub cap_strike: Option<f64>,
     #[serde(default)]
     pub custom_strike: Option<BTreeMap<String, String>>,
     #[serde(default, flatten)]
@@ -488,6 +532,10 @@ pub struct WsEventLifecycle {
     #[serde(default)]
     pub series_ticker: Option<String>,
     #[serde(default)]
+    pub strike_date: Option<i64>,
+    #[serde(default)]
+    pub strike_period: Option<String>,
+    #[serde(default)]
     pub additional_metadata: Option<WsEventLifecycleAdditionalMetadata>,
 }
 
@@ -499,13 +547,19 @@ pub struct WsEventLifecycleAdditionalMetadata {
     pub extra: Map<String, Value>,
 }
 
-/// Market positions message (type: "market_positions")
+/// Market position message (type: "market_position")
 #[derive(Debug, Clone, Deserialize)]
-pub struct WsMarketPositions {
+pub struct WsMarketPosition {
+    pub user_id: String,
+    pub market_ticker: String,
+    pub position_fp: FixedPointCount,
+    pub position_cost_dollars: FixedPointDollars,
+    pub realized_pnl_dollars: FixedPointDollars,
+    pub fees_paid_dollars: FixedPointDollars,
+    pub position_fee_cost_dollars: FixedPointDollars,
+    pub volume_fp: FixedPointCount,
     #[serde(default)]
-    pub market_positions: Vec<MarketPosition>,
-    #[serde(default)]
-    pub event_positions: Vec<EventPosition>,
+    pub subaccount: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -556,6 +610,8 @@ pub struct WsUserOrder {
     #[serde(default)]
     pub side: Option<YesNo>,
     #[serde(default)]
+    pub is_yes: Option<bool>,
+    #[serde(default)]
     pub yes_price_dollars: Option<FixedPointDollars>,
     #[serde(default)]
     pub fill_count_fp: Option<FixedPointCount>,
@@ -580,9 +636,15 @@ pub struct WsUserOrder {
     #[serde(default)]
     pub created_time: Option<String>,
     #[serde(default)]
+    pub created_ts_ms: Option<i64>,
+    #[serde(default)]
     pub last_update_time: Option<String>,
     #[serde(default)]
+    pub last_updated_ts_ms: Option<i64>,
+    #[serde(default)]
     pub expiration_time: Option<String>,
+    #[serde(default)]
+    pub expiration_ts_ms: Option<i64>,
     #[serde(default)]
     pub subaccount_number: Option<u32>,
 }
@@ -812,9 +874,9 @@ impl<'a> EventPositionRef<'a> {
 pub struct WsSubscriptionInfoRef<'a> {
     pub sid: u64,
     #[serde(default)]
-    pub channels: Vec<WsChannel>,
+    pub channels: Vec<WsChannelV2>,
     #[serde(default)]
-    pub channel: Option<WsChannel>,
+    pub channel: Option<WsChannelV2>,
     #[serde(default, borrow)]
     pub market_tickers: Option<Vec<Cow<'a, str>>>,
     #[serde(default, borrow)]
@@ -823,6 +885,8 @@ pub struct WsSubscriptionInfoRef<'a> {
     pub event_tickers: Option<Vec<Cow<'a, str>>>,
     #[serde(default)]
     pub send_initial_snapshot: Option<bool>,
+    #[serde(default)]
+    pub skip_ticker_ack: Option<bool>,
     #[serde(default)]
     pub shard_factor: Option<u32>,
     #[serde(default, borrow)]
@@ -845,6 +909,7 @@ impl<'a> WsSubscriptionInfoRef<'a> {
                 .event_tickers
                 .map(|v| v.into_iter().map(Cow::into_owned).collect()),
             send_initial_snapshot: self.send_initial_snapshot,
+            skip_ticker_ack: self.skip_ticker_ack,
             shard_factor: self.shard_factor,
             shard_key: self.shard_key.map(Cow::into_owned),
         }
@@ -858,8 +923,11 @@ pub struct WsTickerRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(borrow)]
     pub market_id: Cow<'a, str>,
+    #[serde(default)]
     pub price: i64,
+    #[serde(default)]
     pub yes_bid: i64,
+    #[serde(default)]
     pub yes_ask: i64,
     #[serde(borrow)]
     pub price_dollars: Cow<'a, str>,
@@ -867,15 +935,26 @@ pub struct WsTickerRef<'a> {
     pub yes_bid_dollars: Cow<'a, str>,
     #[serde(borrow)]
     pub yes_ask_dollars: Cow<'a, str>,
+    #[serde(borrow)]
+    pub yes_bid_size_fp: Cow<'a, str>,
+    #[serde(borrow)]
+    pub yes_ask_size_fp: Cow<'a, str>,
+    #[serde(borrow)]
+    pub last_trade_size_fp: Cow<'a, str>,
+    #[serde(default)]
     pub volume: i64,
     #[serde(borrow)]
     pub volume_fp: Cow<'a, str>,
+    #[serde(default)]
     pub open_interest: i64,
     #[serde(borrow)]
     pub open_interest_fp: Cow<'a, str>,
     pub dollar_volume: i64,
     pub dollar_open_interest: i64,
     pub ts: i64,
+    pub ts_ms: i64,
+    #[serde(borrow)]
+    pub time: Cow<'a, str>,
 }
 
 impl<'a> WsTickerRef<'a> {
@@ -889,6 +968,9 @@ impl<'a> WsTickerRef<'a> {
             price_dollars: self.price_dollars.into_owned(),
             yes_bid_dollars: self.yes_bid_dollars.into_owned(),
             yes_ask_dollars: self.yes_ask_dollars.into_owned(),
+            yes_bid_size_fp: self.yes_bid_size_fp.into_owned(),
+            yes_ask_size_fp: self.yes_ask_size_fp.into_owned(),
+            last_trade_size_fp: self.last_trade_size_fp.into_owned(),
             volume: self.volume,
             volume_fp: self.volume_fp.into_owned(),
             open_interest: self.open_interest,
@@ -896,6 +978,8 @@ impl<'a> WsTickerRef<'a> {
             dollar_volume: self.dollar_volume,
             dollar_open_interest: self.dollar_open_interest,
             ts: self.ts,
+            ts_ms: self.ts_ms,
+            time: self.time.into_owned(),
         }
     }
 }
@@ -905,24 +989,25 @@ impl<'a> WsTickerRef<'a> {
 pub struct WsTradeRef<'a> {
     #[serde(borrow)]
     pub trade_id: Cow<'a, str>,
-    #[serde(borrow)]
-    pub ticker: Cow<'a, str>,
+    #[serde(alias = "ticker", borrow)]
+    pub market_ticker: Cow<'a, str>,
     #[serde(default)]
     pub price: Option<i64>,
     #[serde(default)]
     pub count: Option<i64>,
-    #[serde(default, borrow)]
-    pub count_fp: Option<Cow<'a, str>>,
+    #[serde(borrow)]
+    pub count_fp: Cow<'a, str>,
     #[serde(default)]
     pub yes_price: Option<i64>,
     #[serde(default)]
     pub no_price: Option<i64>,
-    #[serde(default, borrow)]
-    pub yes_price_dollars: Option<Cow<'a, str>>,
-    #[serde(default, borrow)]
-    pub no_price_dollars: Option<Cow<'a, str>>,
-    #[serde(default)]
-    pub taker_side: Option<TradeTakerSide>,
+    #[serde(borrow)]
+    pub yes_price_dollars: Cow<'a, str>,
+    #[serde(borrow)]
+    pub no_price_dollars: Cow<'a, str>,
+    pub taker_side: TradeTakerSide,
+    pub ts: i64,
+    pub ts_ms: i64,
     #[serde(default, borrow)]
     pub created_time: Option<Cow<'a, str>>,
 }
@@ -931,15 +1016,17 @@ impl<'a> WsTradeRef<'a> {
     pub fn into_owned(self) -> WsTrade {
         WsTrade {
             trade_id: self.trade_id.into_owned(),
-            ticker: self.ticker.into_owned(),
+            market_ticker: self.market_ticker.into_owned(),
             price: self.price,
             count: self.count,
-            count_fp: self.count_fp.map(Cow::into_owned),
+            count_fp: self.count_fp.into_owned(),
             yes_price: self.yes_price,
             no_price: self.no_price,
-            yes_price_dollars: self.yes_price_dollars.map(Cow::into_owned),
-            no_price_dollars: self.no_price_dollars.map(Cow::into_owned),
+            yes_price_dollars: self.yes_price_dollars.into_owned(),
+            no_price_dollars: self.no_price_dollars.into_owned(),
             taker_side: self.taker_side,
+            ts: self.ts,
+            ts_ms: self.ts_ms,
             created_time: self.created_time.map(Cow::into_owned),
         }
     }
@@ -1010,9 +1097,11 @@ pub struct WsOrderbookDeltaRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(borrow)]
     pub market_id: Cow<'a, str>,
+    #[serde(default)]
     pub price: i64,
     #[serde(borrow)]
     pub price_dollars: Cow<'a, str>,
+    #[serde(default)]
     pub delta: i64,
     #[serde(borrow)]
     pub delta_fp: Cow<'a, str>,
@@ -1023,6 +1112,8 @@ pub struct WsOrderbookDeltaRef<'a> {
     pub subaccount: Option<i64>,
     #[serde(default, borrow)]
     pub ts: Option<Cow<'a, str>>,
+    #[serde(default)]
+    pub ts_ms: Option<i64>,
 }
 
 impl<'a> WsOrderbookDeltaRef<'a> {
@@ -1038,6 +1129,7 @@ impl<'a> WsOrderbookDeltaRef<'a> {
             client_order_id: self.client_order_id.map(Cow::into_owned),
             subaccount: self.subaccount,
             ts: self.ts.map(Cow::into_owned),
+            ts_ms: self.ts_ms,
         }
     }
 }
@@ -1046,47 +1138,48 @@ impl<'a> WsOrderbookDeltaRef<'a> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct WsFillRef<'a> {
     #[serde(borrow)]
-    pub fill_id: Cow<'a, str>,
-    #[serde(borrow)]
     pub trade_id: Cow<'a, str>,
     #[serde(borrow)]
     pub order_id: Cow<'a, str>,
     #[serde(default, borrow)]
     pub client_order_id: Option<Cow<'a, str>>,
-    #[serde(borrow)]
-    pub ticker: Cow<'a, str>,
-    #[serde(borrow)]
+    #[serde(alias = "ticker", borrow)]
     pub market_ticker: Cow<'a, str>,
     pub side: YesNo,
     pub action: BuySell,
+    #[serde(default)]
     pub count: i64,
     #[serde(borrow)]
     pub count_fp: Cow<'a, str>,
+    #[serde(default)]
     pub yes_price: i64,
+    #[serde(default)]
     pub no_price: i64,
-    #[serde(alias = "yes_price_dollars", borrow)]
-    pub yes_price_fixed: Cow<'a, str>,
-    #[serde(alias = "no_price_dollars", borrow)]
-    pub no_price_fixed: Cow<'a, str>,
+    #[serde(alias = "yes_price_fixed", borrow)]
+    pub yes_price_dollars: Cow<'a, str>,
+    #[serde(default, alias = "no_price_fixed", borrow)]
+    pub no_price_dollars: Option<Cow<'a, str>>,
     pub is_taker: bool,
     #[serde(borrow)]
     pub fee_cost: Cow<'a, str>,
+    pub ts: i64,
+    pub ts_ms: i64,
+    #[serde(borrow)]
+    pub post_position_fp: Cow<'a, str>,
+    pub purchased_side: YesNo,
     #[serde(default, borrow)]
     pub created_time: Option<Cow<'a, str>>,
     #[serde(default)]
-    pub subaccount_number: Option<i64>,
-    #[serde(default)]
-    pub ts: Option<i64>,
+    #[serde(alias = "subaccount_number")]
+    pub subaccount: Option<i64>,
 }
 
 impl<'a> WsFillRef<'a> {
     pub fn into_owned(self) -> WsFill {
         WsFill {
-            fill_id: self.fill_id.into_owned(),
             trade_id: self.trade_id.into_owned(),
             order_id: self.order_id.into_owned(),
             client_order_id: self.client_order_id.map(Cow::into_owned),
-            ticker: self.ticker.into_owned(),
             market_ticker: self.market_ticker.into_owned(),
             side: self.side,
             action: self.action,
@@ -1094,13 +1187,16 @@ impl<'a> WsFillRef<'a> {
             count_fp: self.count_fp.into_owned(),
             yes_price: self.yes_price,
             no_price: self.no_price,
-            yes_price_fixed: self.yes_price_fixed.into_owned(),
-            no_price_fixed: self.no_price_fixed.into_owned(),
+            yes_price_dollars: self.yes_price_dollars.into_owned(),
+            no_price_dollars: self.no_price_dollars.map(Cow::into_owned),
             is_taker: self.is_taker,
             fee_cost: self.fee_cost.into_owned(),
-            created_time: self.created_time.map(Cow::into_owned),
-            subaccount_number: self.subaccount_number,
             ts: self.ts,
+            ts_ms: self.ts_ms,
+            post_position_fp: self.post_position_fp.into_owned(),
+            purchased_side: self.purchased_side,
+            created_time: self.created_time.map(Cow::into_owned),
+            subaccount: self.subaccount,
         }
     }
 }
@@ -1117,6 +1213,20 @@ pub struct WsMarketLifecycleV2Ref<'a> {
     #[serde(default)]
     pub close_ts: Option<i64>,
     #[serde(default, borrow)]
+    pub result: Option<Cow<'a, str>>,
+    #[serde(default)]
+    pub determination_ts: Option<i64>,
+    #[serde(default, borrow)]
+    pub settlement_value: Option<Cow<'a, str>>,
+    #[serde(default)]
+    pub settled_ts: Option<i64>,
+    #[serde(default)]
+    pub is_deactivated: Option<bool>,
+    #[serde(default)]
+    pub fractional_trading_enabled: Option<bool>,
+    #[serde(default, borrow)]
+    pub price_level_structure: Option<Cow<'a, str>>,
+    #[serde(default, borrow)]
     pub additional_metadata: Option<WsMarketLifecycleAdditionalMetadataRef<'a>>,
 }
 
@@ -1127,6 +1237,13 @@ impl<'a> WsMarketLifecycleV2Ref<'a> {
             event_type: self.event_type,
             open_ts: self.open_ts,
             close_ts: self.close_ts,
+            result: self.result.map(Cow::into_owned),
+            determination_ts: self.determination_ts,
+            settlement_value: self.settlement_value.map(Cow::into_owned),
+            settled_ts: self.settled_ts,
+            is_deactivated: self.is_deactivated,
+            fractional_trading_enabled: self.fractional_trading_enabled,
+            price_level_structure: self.price_level_structure.map(Cow::into_owned),
             additional_metadata: self
                 .additional_metadata
                 .map(WsMarketLifecycleAdditionalMetadataRef::into_owned),
@@ -1157,7 +1274,9 @@ pub struct WsMarketLifecycleAdditionalMetadataRef<'a> {
     #[serde(default, borrow)]
     pub strike_type: Option<Cow<'a, str>>,
     #[serde(default)]
-    pub floor_strike: Option<i64>,
+    pub floor_strike: Option<f64>,
+    #[serde(default)]
+    pub cap_strike: Option<f64>,
     #[serde(default)]
     pub custom_strike: Option<BTreeMap<String, String>>,
     #[serde(default, flatten)]
@@ -1178,6 +1297,7 @@ impl<'a> WsMarketLifecycleAdditionalMetadataRef<'a> {
             expected_expiration_ts: self.expected_expiration_ts,
             strike_type: self.strike_type.map(Cow::into_owned),
             floor_strike: self.floor_strike,
+            cap_strike: self.cap_strike,
             custom_strike: self.custom_strike,
             extra: self.extra,
         }
@@ -1198,6 +1318,10 @@ pub struct WsEventLifecycleRef<'a> {
     #[serde(default, borrow)]
     pub series_ticker: Option<Cow<'a, str>>,
     #[serde(default)]
+    pub strike_date: Option<i64>,
+    #[serde(default, borrow)]
+    pub strike_period: Option<Cow<'a, str>>,
+    #[serde(default)]
     pub additional_metadata: Option<WsEventLifecycleAdditionalMetadataRef>,
 }
 
@@ -1209,6 +1333,8 @@ impl<'a> WsEventLifecycleRef<'a> {
             subtitle: self.subtitle.map(Cow::into_owned),
             collateral_return_type: self.collateral_return_type.map(Cow::into_owned),
             series_ticker: self.series_ticker.map(Cow::into_owned),
+            strike_date: self.strike_date,
+            strike_period: self.strike_period.map(Cow::into_owned),
             additional_metadata: self
                 .additional_metadata
                 .map(WsEventLifecycleAdditionalMetadataRef::into_owned),
@@ -1233,28 +1359,41 @@ impl WsEventLifecycleAdditionalMetadataRef {
     }
 }
 
-/// Market positions message (type: "market_positions")
+/// Market position message (type: "market_position")
 #[derive(Debug, Clone, Deserialize)]
-pub struct WsMarketPositionsRef<'a> {
-    #[serde(default, borrow)]
-    pub market_positions: Vec<MarketPositionRef<'a>>,
-    #[serde(default, borrow)]
-    pub event_positions: Vec<EventPositionRef<'a>>,
+pub struct WsMarketPositionRef<'a> {
+    #[serde(borrow)]
+    pub user_id: Cow<'a, str>,
+    #[serde(borrow)]
+    pub market_ticker: Cow<'a, str>,
+    #[serde(borrow)]
+    pub position_fp: FixedPointCountRef<'a>,
+    #[serde(borrow)]
+    pub position_cost_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub realized_pnl_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub fees_paid_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub position_fee_cost_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub volume_fp: FixedPointCountRef<'a>,
+    #[serde(default)]
+    pub subaccount: Option<u32>,
 }
 
-impl<'a> WsMarketPositionsRef<'a> {
-    pub fn into_owned(self) -> WsMarketPositions {
-        WsMarketPositions {
-            market_positions: self
-                .market_positions
-                .into_iter()
-                .map(MarketPositionRef::into_owned)
-                .collect(),
-            event_positions: self
-                .event_positions
-                .into_iter()
-                .map(EventPositionRef::into_owned)
-                .collect(),
+impl<'a> WsMarketPositionRef<'a> {
+    pub fn into_owned(self) -> WsMarketPosition {
+        WsMarketPosition {
+            user_id: self.user_id.into_owned(),
+            market_ticker: self.market_ticker.into_owned(),
+            position_fp: self.position_fp.into_owned(),
+            position_cost_dollars: self.position_cost_dollars.into_owned(),
+            realized_pnl_dollars: self.realized_pnl_dollars.into_owned(),
+            fees_paid_dollars: self.fees_paid_dollars.into_owned(),
+            position_fee_cost_dollars: self.position_fee_cost_dollars.into_owned(),
+            volume_fp: self.volume_fp.into_owned(),
+            subaccount: self.subaccount,
         }
     }
 }
@@ -1671,7 +1810,7 @@ impl WsEnvelope {
         self.msg.as_deref().map(|raw| raw.get())
     }
 
-    pub fn into_message(self) -> Result<WsMessage, KalshiError> {
+    pub fn into_message(self) -> Result<WsMessageV2, KalshiError> {
         fn parse_msg<T: for<'de> Deserialize<'de>>(
             msg: &Option<Box<RawValue>>,
         ) -> Result<T, serde_json::Error> {
@@ -1684,7 +1823,7 @@ impl WsEnvelope {
         #[derive(Deserialize)]
         struct SubscribedMsg {
             #[allow(dead_code)]
-            channel: Option<WsChannel>,
+            channel: Option<WsChannelV2>,
             sid: Option<u64>,
         }
 
@@ -1704,16 +1843,16 @@ impl WsEnvelope {
                         .ok()
                         .and_then(|value| value.sid)
                 });
-                Ok(WsMessage::Subscribed { id, sid })
+                Ok(WsMessageV2::Subscribed { id, sid })
             }
-            WsMsgType::Unsubscribed => Ok(WsMessage::Unsubscribed { id, sid }),
+            WsMsgType::Unsubscribed => Ok(WsMessageV2::Unsubscribed { id, sid }),
             WsMsgType::Ok => {
                 if msg.is_some()
                     && let Ok(subscriptions) = parse_msg::<Vec<WsSubscriptionInfo>>(&msg)
                 {
-                    return Ok(WsMessage::ListSubscriptions { id, subscriptions });
+                    return Ok(WsMessageV2::ListSubscriptions { id, subscriptions });
                 }
-                Ok(WsMessage::Ok { id })
+                Ok(WsMessageV2::Ok { id })
             }
             WsMsgType::ListSubscriptions => {
                 let subs = if msg.is_some() {
@@ -1722,7 +1861,7 @@ impl WsEnvelope {
                 } else {
                     subscriptions.unwrap_or_default()
                 };
-                Ok(WsMessage::ListSubscriptions {
+                Ok(WsMessageV2::ListSubscriptions {
                     id,
                     subscriptions: subs,
                 })
@@ -1736,95 +1875,108 @@ impl WsEnvelope {
                         message: None,
                     }
                 };
-                Ok(WsMessage::Error { id, error })
+                Ok(WsMessageV2::Error { id, error })
             }
-            WsMsgType::Ticker => Ok(WsMessage::Data(WsDataMessage::Ticker {
+            WsMsgType::Ticker => Ok(WsMessageV2::Data(WsDataMessageV2::Ticker {
                 sid,
                 seq,
                 msg: parse_msg(&msg)?,
             })),
-            WsMsgType::Trade => Ok(WsMessage::Data(WsDataMessage::Trade {
+            WsMsgType::Trade => Ok(WsMessageV2::Data(WsDataMessageV2::Trade {
                 sid,
                 seq,
                 msg: parse_msg(&msg)?,
             })),
-            WsMsgType::OrderbookSnapshot => Ok(WsMessage::Data(WsDataMessage::OrderbookSnapshot {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::OrderbookDelta => Ok(WsMessage::Data(WsDataMessage::OrderbookDelta {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::Fill => Ok(WsMessage::Data(WsDataMessage::Fill {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::MarketPositions => Ok(WsMessage::Data(WsDataMessage::MarketPositions {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::MarketLifecycleV2 => Ok(WsMessage::Data(WsDataMessage::MarketLifecycleV2 {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::EventLifecycle => Ok(WsMessage::Data(WsDataMessage::EventLifecycle {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::Multivariate | WsMsgType::MultivariateLookup => {
-                Ok(WsMessage::Data(WsDataMessage::Multivariate {
+            WsMsgType::OrderbookSnapshot => {
+                Ok(WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot {
                     sid,
                     seq,
                     msg: parse_msg(&msg)?,
                 }))
             }
-            WsMsgType::RfqCreated => Ok(WsMessage::Data(WsDataMessage::Communications {
+            WsMsgType::OrderbookDelta => Ok(WsMessageV2::Data(WsDataMessageV2::OrderbookDelta {
+                sid,
+                seq,
+                msg: parse_msg(&msg)?,
+            })),
+            WsMsgType::Fill => Ok(WsMessageV2::Data(WsDataMessageV2::Fill {
+                sid,
+                seq,
+                msg: parse_msg(&msg)?,
+            })),
+            WsMsgType::MarketPosition => Ok(WsMessageV2::Data(WsDataMessageV2::MarketPosition {
+                sid,
+                seq,
+                msg: parse_msg(&msg)?,
+            })),
+            WsMsgType::MarketLifecycleV2 => {
+                Ok(WsMessageV2::Data(WsDataMessageV2::MarketLifecycleV2 {
+                    sid,
+                    seq,
+                    msg: parse_msg(&msg)?,
+                }))
+            }
+            WsMsgType::MultivariateMarketLifecycle => Ok(WsMessageV2::Data(
+                WsDataMessageV2::MultivariateMarketLifecycle {
+                    sid,
+                    seq,
+                    msg: parse_msg(&msg)?,
+                },
+            )),
+            WsMsgType::EventLifecycle => Ok(WsMessageV2::Data(WsDataMessageV2::EventLifecycle {
+                sid,
+                seq,
+                msg: parse_msg(&msg)?,
+            })),
+            WsMsgType::Multivariate | WsMsgType::MultivariateLookup => {
+                Ok(WsMessageV2::Data(WsDataMessageV2::Multivariate {
+                    sid,
+                    seq,
+                    msg: parse_msg(&msg)?,
+                }))
+            }
+            WsMsgType::RfqCreated => Ok(WsMessageV2::Data(WsDataMessageV2::Communications {
                 sid,
                 seq,
                 msg: WsCommunications::RfqCreated(parse_msg(&msg)?),
             })),
-            WsMsgType::RfqDeleted => Ok(WsMessage::Data(WsDataMessage::Communications {
+            WsMsgType::RfqDeleted => Ok(WsMessageV2::Data(WsDataMessageV2::Communications {
                 sid,
                 seq,
                 msg: WsCommunications::RfqDeleted(parse_msg(&msg)?),
             })),
-            WsMsgType::QuoteCreated => Ok(WsMessage::Data(WsDataMessage::Communications {
+            WsMsgType::QuoteCreated => Ok(WsMessageV2::Data(WsDataMessageV2::Communications {
                 sid,
                 seq,
                 msg: WsCommunications::QuoteCreated(parse_msg(&msg)?),
             })),
-            WsMsgType::QuoteAccepted => Ok(WsMessage::Data(WsDataMessage::Communications {
+            WsMsgType::QuoteAccepted => Ok(WsMessageV2::Data(WsDataMessageV2::Communications {
                 sid,
                 seq,
                 msg: WsCommunications::QuoteAccepted(parse_msg(&msg)?),
             })),
-            WsMsgType::QuoteExecuted => Ok(WsMessage::Data(WsDataMessage::Communications {
+            WsMsgType::QuoteExecuted => Ok(WsMessageV2::Data(WsDataMessageV2::Communications {
                 sid,
                 seq,
                 msg: WsCommunications::QuoteExecuted(parse_msg(&msg)?),
             })),
-            WsMsgType::OrderGroupUpdates => Ok(WsMessage::Data(WsDataMessage::OrderGroupUpdates {
+            WsMsgType::OrderGroupUpdates => {
+                Ok(WsMessageV2::Data(WsDataMessageV2::OrderGroupUpdates {
+                    sid,
+                    seq,
+                    msg: parse_msg(&msg)?,
+                }))
+            }
+            WsMsgType::UserOrder => Ok(WsMessageV2::Data(WsDataMessageV2::UserOrder {
                 sid,
                 seq,
                 msg: parse_msg(&msg)?,
             })),
-            WsMsgType::UserOrder => Ok(WsMessage::Data(WsDataMessage::UserOrder {
-                sid,
-                seq,
-                msg: parse_msg(&msg)?,
-            })),
-            WsMsgType::Communications => Ok(WsMessage::Unknown {
+            WsMsgType::Communications => Ok(WsMessageV2::Unknown {
                 msg_type: WsMsgType::Communications,
                 raw: msg,
             }),
-            other => Ok(WsMessage::Unknown {
+            other => Ok(WsMessageV2::Unknown {
                 msg_type: other,
                 raw: msg,
             }),
@@ -1861,7 +2013,7 @@ impl<'a> WsEnvelopeRef<'a> {
         #[derive(Deserialize)]
         struct SubscribedMsg {
             #[allow(dead_code)]
-            channel: Option<WsChannel>,
+            channel: Option<WsChannelV2>,
             sid: Option<u64>,
         }
 
@@ -1943,13 +2095,11 @@ impl<'a> WsEnvelopeRef<'a> {
                 seq,
                 msg: parse_borrowed_msg(msg)?,
             })),
-            WsMsgType::MarketPositions => {
-                Ok(WsMessageRef::Data(WsDataMessageRef::MarketPositions {
-                    sid,
-                    seq,
-                    msg: parse_borrowed_msg(msg)?,
-                }))
-            }
+            WsMsgType::MarketPosition => Ok(WsMessageRef::Data(WsDataMessageRef::MarketPosition {
+                sid,
+                seq,
+                msg: parse_borrowed_msg(msg)?,
+            })),
             WsMsgType::MarketLifecycleV2 => {
                 Ok(WsMessageRef::Data(WsDataMessageRef::MarketLifecycleV2 {
                     sid,
@@ -1957,6 +2107,13 @@ impl<'a> WsEnvelopeRef<'a> {
                     msg: parse_borrowed_msg(msg)?,
                 }))
             }
+            WsMsgType::MultivariateMarketLifecycle => Ok(WsMessageRef::Data(
+                WsDataMessageRef::MultivariateMarketLifecycle {
+                    sid,
+                    seq,
+                    msg: parse_borrowed_msg(msg)?,
+                },
+            )),
             WsMsgType::EventLifecycle => Ok(WsMessageRef::Data(WsDataMessageRef::EventLifecycle {
                 sid,
                 seq,
@@ -2033,7 +2190,7 @@ pub struct WsError {
 }
 
 #[derive(Debug, Clone)]
-pub enum WsMessage {
+pub enum WsMessageV2 {
     Subscribed {
         id: Option<u64>,
         sid: Option<u64>,
@@ -2053,7 +2210,7 @@ pub enum WsMessage {
         id: Option<u64>,
         error: WsError,
     },
-    Data(WsDataMessage),
+    Data(WsDataMessageV2),
     Unknown {
         msg_type: WsMsgType,
         raw: Option<Box<RawValue>>,
@@ -2061,7 +2218,7 @@ pub enum WsMessage {
 }
 
 #[derive(Debug, Clone)]
-pub enum WsDataMessage {
+pub enum WsDataMessageV2 {
     Ticker {
         sid: Option<u64>,
         seq: Option<u64>,
@@ -2087,12 +2244,17 @@ pub enum WsDataMessage {
         seq: Option<u64>,
         msg: WsFill,
     },
-    MarketPositions {
+    MarketPosition {
         sid: Option<u64>,
         seq: Option<u64>,
-        msg: WsMarketPositions,
+        msg: WsMarketPosition,
     },
     MarketLifecycleV2 {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsMarketLifecycleV2,
+    },
+    MultivariateMarketLifecycle {
         sid: Option<u64>,
         seq: Option<u64>,
         msg: WsMarketLifecycleV2,
@@ -2151,12 +2313,17 @@ pub enum WsDataMessageRef<'a> {
         seq: Option<u64>,
         msg: WsFillRef<'a>,
     },
-    MarketPositions {
+    MarketPosition {
         sid: Option<u64>,
         seq: Option<u64>,
-        msg: WsMarketPositionsRef<'a>,
+        msg: WsMarketPositionRef<'a>,
     },
     MarketLifecycleV2 {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsMarketLifecycleV2Ref<'a>,
+    },
+    MultivariateMarketLifecycle {
         sid: Option<u64>,
         seq: Option<u64>,
         msg: WsMarketLifecycleV2Ref<'a>,
@@ -2189,71 +2356,78 @@ pub enum WsDataMessageRef<'a> {
 }
 
 impl<'a> WsDataMessageRef<'a> {
-    pub fn into_owned(self) -> WsDataMessage {
+    pub fn into_owned(self) -> WsDataMessageV2 {
         match self {
-            WsDataMessageRef::Ticker { sid, seq, msg } => WsDataMessage::Ticker {
+            WsDataMessageRef::Ticker { sid, seq, msg } => WsDataMessageV2::Ticker {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
-            WsDataMessageRef::Trade { sid, seq, msg } => WsDataMessage::Trade {
+            WsDataMessageRef::Trade { sid, seq, msg } => WsDataMessageV2::Trade {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
             WsDataMessageRef::OrderbookSnapshot { sid, seq, msg } => {
-                WsDataMessage::OrderbookSnapshot {
+                WsDataMessageV2::OrderbookSnapshot {
                     sid,
                     seq,
                     msg: msg.into_owned(),
                 }
             }
-            WsDataMessageRef::OrderbookDelta { sid, seq, msg } => WsDataMessage::OrderbookDelta {
+            WsDataMessageRef::OrderbookDelta { sid, seq, msg } => WsDataMessageV2::OrderbookDelta {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
-            WsDataMessageRef::Fill { sid, seq, msg } => WsDataMessage::Fill {
+            WsDataMessageRef::Fill { sid, seq, msg } => WsDataMessageV2::Fill {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
-            WsDataMessageRef::MarketPositions { sid, seq, msg } => WsDataMessage::MarketPositions {
+            WsDataMessageRef::MarketPosition { sid, seq, msg } => WsDataMessageV2::MarketPosition {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
             WsDataMessageRef::MarketLifecycleV2 { sid, seq, msg } => {
-                WsDataMessage::MarketLifecycleV2 {
+                WsDataMessageV2::MarketLifecycleV2 {
                     sid,
                     seq,
                     msg: msg.into_owned(),
                 }
             }
-            WsDataMessageRef::EventLifecycle { sid, seq, msg } => WsDataMessage::EventLifecycle {
+            WsDataMessageRef::MultivariateMarketLifecycle { sid, seq, msg } => {
+                WsDataMessageV2::MultivariateMarketLifecycle {
+                    sid,
+                    seq,
+                    msg: msg.into_owned(),
+                }
+            }
+            WsDataMessageRef::EventLifecycle { sid, seq, msg } => WsDataMessageV2::EventLifecycle {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
-            WsDataMessageRef::Multivariate { sid, seq, msg } => WsDataMessage::Multivariate {
+            WsDataMessageRef::Multivariate { sid, seq, msg } => WsDataMessageV2::Multivariate {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
-            WsDataMessageRef::Communications { sid, seq, msg } => WsDataMessage::Communications {
+            WsDataMessageRef::Communications { sid, seq, msg } => WsDataMessageV2::Communications {
                 sid,
                 seq,
                 msg: msg.into_owned(),
             },
             WsDataMessageRef::OrderGroupUpdates { sid, seq, msg } => {
-                WsDataMessage::OrderGroupUpdates {
+                WsDataMessageV2::OrderGroupUpdates {
                     sid,
                     seq,
                     msg: msg.into_owned(),
                 }
             }
             WsDataMessageRef::UserOrder { sid, seq, msg } => {
-                WsDataMessage::UserOrder { sid, seq, msg }
+                WsDataMessageV2::UserOrder { sid, seq, msg }
             }
         }
     }
@@ -2292,29 +2466,31 @@ pub enum WsMessageRef<'a> {
 }
 
 impl<'a> WsMessageRef<'a> {
-    pub fn into_owned(self) -> Result<WsMessage, KalshiError> {
+    pub fn into_owned(self) -> Result<WsMessageV2, KalshiError> {
         let owned = match self {
-            WsMessageRef::Subscribed { id, sid } => WsMessage::Subscribed { id, sid },
-            WsMessageRef::Unsubscribed { id, sid } => WsMessage::Unsubscribed { id, sid },
-            WsMessageRef::ListSubscriptions { id, subscriptions } => WsMessage::ListSubscriptions {
-                id,
-                subscriptions: subscriptions
-                    .into_iter()
-                    .map(WsSubscriptionInfoRef::into_owned)
-                    .collect(),
-            },
-            WsMessageRef::Ok { id } => WsMessage::Ok { id },
-            WsMessageRef::Error { id, error } => WsMessage::Error {
+            WsMessageRef::Subscribed { id, sid } => WsMessageV2::Subscribed { id, sid },
+            WsMessageRef::Unsubscribed { id, sid } => WsMessageV2::Unsubscribed { id, sid },
+            WsMessageRef::ListSubscriptions { id, subscriptions } => {
+                WsMessageV2::ListSubscriptions {
+                    id,
+                    subscriptions: subscriptions
+                        .into_iter()
+                        .map(WsSubscriptionInfoRef::into_owned)
+                        .collect(),
+                }
+            }
+            WsMessageRef::Ok { id } => WsMessageV2::Ok { id },
+            WsMessageRef::Error { id, error } => WsMessageV2::Error {
                 id,
                 error: error.into_owned(),
             },
-            WsMessageRef::Data(data) => WsMessage::Data(data.into_owned()),
+            WsMessageRef::Data(data) => WsMessageV2::Data(data.into_owned()),
             WsMessageRef::Unknown { msg_type, raw } => {
                 let raw_owned = match raw {
                     Some(value) => Some(serde_json::from_str::<Box<RawValue>>(value.get())?),
                     None => None,
                 };
-                WsMessage::Unknown {
+                WsMessageV2::Unknown {
                     msg_type,
                     raw: raw_owned,
                 }
@@ -2346,8 +2522,8 @@ impl WsRawEvent {
         std::str::from_utf8(&self.bytes).ok()
     }
 
-    pub fn parse_owned(&self) -> Result<WsMessage, KalshiError> {
-        WsMessage::from_bytes(&self.bytes)
+    pub fn parse_owned(&self) -> Result<WsMessageV2, KalshiError> {
+        WsMessageV2::from_bytes(&self.bytes)
     }
 
     pub fn parse_borrowed(&self) -> Result<WsMessageRef<'_>, KalshiError> {
@@ -2359,18 +2535,18 @@ impl WsRawEvent {
 pub(crate) struct WsSubscribeCmd {
     pub id: u64,
     pub cmd: &'static str, // "subscribe"
-    pub params: WsSubscriptionParams,
+    pub params: WsSubscriptionParamsV2,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct WsUnsubscribeCmd {
     pub id: u64,
     pub cmd: &'static str,
-    pub params: WsUnsubscribeParams,
+    pub params: WsUnsubscribeParamsV2,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WsUnsubscribeParams {
+pub struct WsUnsubscribeParamsV2 {
     pub sids: Vec<u64>,
 }
 
@@ -2384,11 +2560,11 @@ pub(crate) struct WsListSubscriptionsCmd {
 pub(crate) struct WsUpdateSubscriptionCmd {
     pub id: u64,
     pub cmd: &'static str,
-    pub params: WsUpdateSubscriptionParams,
+    pub params: WsUpdateSubscriptionParamsV2,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WsUpdateSubscriptionParams {
+pub struct WsUpdateSubscriptionParamsV2 {
     pub action: WsUpdateAction,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sid: Option<u64>,
@@ -2404,9 +2580,11 @@ pub struct WsUpdateSubscriptionParams {
     pub market_ids: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub send_initial_snapshot: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_ticker_ack: Option<bool>,
 }
 
-impl WsUpdateSubscriptionParams {
+impl WsUpdateSubscriptionParamsV2 {
     pub fn target_sid(&self) -> Option<u64> {
         self.sid.or_else(|| {
             self.sids
@@ -2423,7 +2601,7 @@ pub enum WsUpdateAction {
     DeleteMarkets,
 }
 
-pub(crate) fn validate_update(params: &WsUpdateSubscriptionParams) -> Result<(), KalshiError> {
+pub(crate) fn validate_update(params: &WsUpdateSubscriptionParamsV2) -> Result<(), KalshiError> {
     let has_sid = params.sid.is_some();
     let has_sids = params.sids.is_some();
     if has_sid == has_sids {
@@ -2441,7 +2619,7 @@ pub(crate) fn validate_update(params: &WsUpdateSubscriptionParams) -> Result<(),
     Ok(())
 }
 
-pub(crate) fn validate_subscription(params: &WsSubscriptionParams) -> Result<(), KalshiError> {
+pub(crate) fn validate_subscription(params: &WsSubscriptionParamsV2) -> Result<(), KalshiError> {
     if params.channels.is_empty() {
         return Err(KalshiError::InvalidParams(
             "subscribe: at least one channel is required".to_string(),
@@ -2482,19 +2660,25 @@ pub(crate) fn validate_subscription(params: &WsSubscriptionParams) -> Result<(),
     let has_orderbook_delta = params
         .channels
         .iter()
-        .any(|c| matches!(c, WsChannel::OrderbookDelta));
+        .any(|c| matches!(c, WsChannelV2::OrderbookDelta));
     let has_market_positions = params
         .channels
         .iter()
-        .any(|c| matches!(c, WsChannel::MarketPositions));
+        .any(|c| matches!(c, WsChannelV2::MarketPositions));
     let has_communications = params
         .channels
         .iter()
-        .any(|c| matches!(c, WsChannel::Communications));
+        .any(|c| matches!(c, WsChannelV2::Communications));
 
-    if has_orderbook_delta && !(has_any_market_tickers || has_any_market_ids) {
+    if has_orderbook_delta && !has_any_market_tickers {
         return Err(KalshiError::InvalidParams(
-            "subscribe: orderbook_delta requires market_tickers or market_ids".to_string(),
+            "subscribe: orderbook_delta requires market_ticker or market_tickers".to_string(),
+        ));
+    }
+
+    if has_orderbook_delta && has_any_market_ids {
+        return Err(KalshiError::InvalidParams(
+            "subscribe: orderbook_delta does not support market_id or market_ids".to_string(),
         ));
     }
 
@@ -2587,14 +2771,20 @@ enum WsWireMessage {
         seq: Option<u64>,
         msg: WsFill,
     },
-    #[serde(rename = "market_positions")]
-    MarketPositions {
+    #[serde(rename = "market_position", alias = "market_positions")]
+    MarketPosition {
         sid: Option<u64>,
         seq: Option<u64>,
-        msg: WsMarketPositions,
+        msg: WsMarketPosition,
     },
     #[serde(rename = "market_lifecycle_v2")]
     MarketLifecycleV2 {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsMarketLifecycleV2,
+    },
+    #[serde(rename = "multivariate_market_lifecycle")]
+    MultivariateMarketLifecycle {
         sid: Option<u64>,
         seq: Option<u64>,
         msg: WsMarketLifecycleV2,
@@ -2664,26 +2854,26 @@ enum WsWireMessage {
 #[derive(Debug, Deserialize)]
 struct WsSubscribedMsg {
     #[allow(dead_code)]
-    channel: Option<WsChannel>,
+    channel: Option<WsChannelV2>,
     sid: Option<u64>,
 }
 
 impl WsWireMessage {
-    fn into_message(self) -> WsMessage {
+    fn into_message(self) -> WsMessageV2 {
         match self {
-            WsWireMessage::Subscribed { id, sid, msg } => WsMessage::Subscribed {
+            WsWireMessage::Subscribed { id, sid, msg } => WsMessageV2::Subscribed {
                 id,
                 sid: sid.or_else(|| msg.and_then(|value| value.sid)),
             },
-            WsWireMessage::Unsubscribed { id, sid } => WsMessage::Unsubscribed { id, sid },
+            WsWireMessage::Unsubscribed { id, sid } => WsMessageV2::Unsubscribed { id, sid },
             WsWireMessage::Ok { id, msg } => {
                 if let Some(msg) = msg
                     && let Ok(subscriptions) =
                         serde_json::from_value::<Vec<WsSubscriptionInfo>>(msg)
                 {
-                    return WsMessage::ListSubscriptions { id, subscriptions };
+                    return WsMessageV2::ListSubscriptions { id, subscriptions };
                 }
-                WsMessage::Ok { id }
+                WsMessageV2::Ok { id }
             }
             WsWireMessage::ListSubscriptions {
                 id,
@@ -2693,12 +2883,12 @@ impl WsWireMessage {
                 let subs = msg
                     .map(|value| value.subscriptions)
                     .unwrap_or(subscriptions);
-                WsMessage::ListSubscriptions {
+                WsMessageV2::ListSubscriptions {
                     id,
                     subscriptions: subs,
                 }
             }
-            WsWireMessage::Error { id, msg } => WsMessage::Error {
+            WsWireMessage::Error { id, msg } => WsMessageV2::Error {
                 id,
                 error: msg.unwrap_or(WsError {
                     code: None,
@@ -2706,73 +2896,76 @@ impl WsWireMessage {
                 }),
             },
             WsWireMessage::Ticker { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Ticker { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::Ticker { sid, seq, msg })
             }
             WsWireMessage::Trade { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Trade { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::Trade { sid, seq, msg })
             }
             WsWireMessage::OrderbookSnapshot { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::OrderbookSnapshot { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot { sid, seq, msg })
             }
             WsWireMessage::OrderbookDelta { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::OrderbookDelta { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::OrderbookDelta { sid, seq, msg })
             }
             WsWireMessage::Fill { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Fill { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::Fill { sid, seq, msg })
             }
-            WsWireMessage::MarketPositions { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::MarketPositions { sid, seq, msg })
+            WsWireMessage::MarketPosition { sid, seq, msg } => {
+                WsMessageV2::Data(WsDataMessageV2::MarketPosition { sid, seq, msg })
             }
             WsWireMessage::MarketLifecycleV2 { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::MarketLifecycleV2 { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::MarketLifecycleV2 { sid, seq, msg })
+            }
+            WsWireMessage::MultivariateMarketLifecycle { sid, seq, msg } => {
+                WsMessageV2::Data(WsDataMessageV2::MultivariateMarketLifecycle { sid, seq, msg })
             }
             WsWireMessage::EventLifecycle { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::EventLifecycle { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::EventLifecycle { sid, seq, msg })
             }
             WsWireMessage::Multivariate { sid, seq, msg }
             | WsWireMessage::MultivariateLookup { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Multivariate { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::Multivariate { sid, seq, msg })
             }
             WsWireMessage::RfqCreated { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Communications {
+                WsMessageV2::Data(WsDataMessageV2::Communications {
                     sid,
                     seq,
                     msg: WsCommunications::RfqCreated(msg),
                 })
             }
             WsWireMessage::RfqDeleted { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Communications {
+                WsMessageV2::Data(WsDataMessageV2::Communications {
                     sid,
                     seq,
                     msg: WsCommunications::RfqDeleted(msg),
                 })
             }
             WsWireMessage::QuoteCreated { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Communications {
+                WsMessageV2::Data(WsDataMessageV2::Communications {
                     sid,
                     seq,
                     msg: WsCommunications::QuoteCreated(msg),
                 })
             }
             WsWireMessage::QuoteAccepted { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Communications {
+                WsMessageV2::Data(WsDataMessageV2::Communications {
                     sid,
                     seq,
                     msg: WsCommunications::QuoteAccepted(msg),
                 })
             }
             WsWireMessage::QuoteExecuted { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::Communications {
+                WsMessageV2::Data(WsDataMessageV2::Communications {
                     sid,
                     seq,
                     msg: WsCommunications::QuoteExecuted(msg),
                 })
             }
             WsWireMessage::OrderGroupUpdates { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::OrderGroupUpdates { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::OrderGroupUpdates { sid, seq, msg })
             }
             WsWireMessage::UserOrder { sid, seq, msg } => {
-                WsMessage::Data(WsDataMessage::UserOrder { sid, seq, msg })
+                WsMessageV2::Data(WsDataMessageV2::UserOrder { sid, seq, msg })
             }
         }
     }
@@ -2845,15 +3038,22 @@ enum WsWireMessageRef<'a> {
         #[serde(borrow)]
         msg: WsFillRef<'a>,
     },
-    #[serde(rename = "market_positions")]
-    MarketPositions {
+    #[serde(rename = "market_position", alias = "market_positions")]
+    MarketPosition {
         sid: Option<u64>,
         seq: Option<u64>,
         #[serde(borrow)]
-        msg: WsMarketPositionsRef<'a>,
+        msg: WsMarketPositionRef<'a>,
     },
     #[serde(rename = "market_lifecycle_v2")]
     MarketLifecycleV2 {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        #[serde(borrow)]
+        msg: WsMarketLifecycleV2Ref<'a>,
+    },
+    #[serde(rename = "multivariate_market_lifecycle")]
+    MultivariateMarketLifecycle {
         sid: Option<u64>,
         seq: Option<u64>,
         #[serde(borrow)]
@@ -2933,7 +3133,7 @@ enum WsWireMessageRef<'a> {
 #[derive(Debug, Deserialize)]
 struct WsSubscribedMsgRef {
     #[allow(dead_code)]
-    channel: Option<WsChannel>,
+    channel: Option<WsChannelV2>,
     #[serde(default)]
     sid: Option<u64>,
 }
@@ -2990,11 +3190,14 @@ impl<'a> WsWireMessageRef<'a> {
             WsWireMessageRef::Fill { sid, seq, msg } => {
                 WsMessageRef::Data(WsDataMessageRef::Fill { sid, seq, msg })
             }
-            WsWireMessageRef::MarketPositions { sid, seq, msg } => {
-                WsMessageRef::Data(WsDataMessageRef::MarketPositions { sid, seq, msg })
+            WsWireMessageRef::MarketPosition { sid, seq, msg } => {
+                WsMessageRef::Data(WsDataMessageRef::MarketPosition { sid, seq, msg })
             }
             WsWireMessageRef::MarketLifecycleV2 { sid, seq, msg } => {
                 WsMessageRef::Data(WsDataMessageRef::MarketLifecycleV2 { sid, seq, msg })
+            }
+            WsWireMessageRef::MultivariateMarketLifecycle { sid, seq, msg } => {
+                WsMessageRef::Data(WsDataMessageRef::MultivariateMarketLifecycle { sid, seq, msg })
             }
             WsWireMessageRef::EventLifecycle { sid, seq, msg } => {
                 WsMessageRef::Data(WsDataMessageRef::EventLifecycle { sid, seq, msg })
@@ -3048,7 +3251,7 @@ impl<'a> WsWireMessageRef<'a> {
     }
 }
 
-impl WsMessage {
+impl WsMessageV2 {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KalshiError> {
         match serde_json::from_slice::<WsWireMessage>(bytes) {
             Ok(wire) => Ok(wire.into_message()),
@@ -3103,14 +3306,14 @@ mod tests {
 
     #[test]
     fn validate_subscription_requires_market_tickers_for_orderbook_delta() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::OrderbookDelta],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
             ..Default::default()
         };
         assert!(validate_subscription(&params).is_err());
 
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::OrderbookDelta],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
             market_tickers: Some(vec!["TEST".to_string()]),
             ..Default::default()
         };
@@ -3119,8 +3322,8 @@ mod tests {
 
     #[test]
     fn validate_subscription_send_initial_snapshot_only_for_orderbook_delta() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             send_initial_snapshot: Some(true),
             ..Default::default()
         };
@@ -3128,19 +3331,19 @@ mod tests {
     }
 
     #[test]
-    fn validate_subscription_orderbook_delta_allows_market_ids() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::OrderbookDelta],
+    fn validate_subscription_orderbook_delta_rejects_market_ids() {
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
             market_ids: Some(vec!["mid-1".to_string()]),
             ..Default::default()
         };
-        assert!(validate_subscription(&params).is_ok());
+        assert!(validate_subscription(&params).is_err());
     }
 
     #[test]
     fn validate_subscription_rejects_market_positions_with_market_ids() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::MarketPositions],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::MarketPositions],
             market_ids: Some(vec!["mid-1".to_string()]),
             ..Default::default()
         };
@@ -3149,15 +3352,15 @@ mod tests {
 
     #[test]
     fn validate_subscription_shard_fields_require_communications() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             shard_factor: Some(2),
             ..Default::default()
         };
         assert!(validate_subscription(&params).is_err());
 
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Communications],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Communications],
             shard_factor: Some(2),
             shard_key: Some(1),
             ..Default::default()
@@ -3167,8 +3370,8 @@ mod tests {
 
     #[test]
     fn validate_subscription_send_initial_snapshot_with_orderbook_delta_ok() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::OrderbookDelta],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
             market_tickers: Some(vec!["TEST".to_string()]),
             send_initial_snapshot: Some(true),
             ..Default::default()
@@ -3197,24 +3400,27 @@ mod tests {
             "msg":{
                 "market_ticker":"TEST",
                 "market_id":"1",
-                "price":1,
-                "yes_bid":1,
-                "yes_ask":2,
                 "price_dollars":"0.01",
                 "yes_bid_dollars":"0.01",
                 "yes_ask_dollars":"0.02",
-                "volume":0,
+                "yes_bid_size_fp":"1.00",
+                "yes_ask_size_fp":"2.00",
+                "last_trade_size_fp":"1.00",
                 "volume_fp":"0",
-                "open_interest":0,
                 "open_interest_fp":"0",
                 "dollar_volume":0,
                 "dollar_open_interest":0,
-                "ts":0
+                "ts":0,
+                "ts_ms":0,
+                "time":"1970-01-01T00:00:00Z"
             }
         }"#;
         let env: WsEnvelope = serde_json::from_str(json).unwrap();
         let msg = env.into_message().unwrap();
-        assert!(matches!(msg, WsMessage::Data(WsDataMessage::Ticker { .. })));
+        assert!(matches!(
+            msg,
+            WsMessageV2::Data(WsDataMessageV2::Ticker { .. })
+        ));
     }
 
     #[test]
@@ -3223,7 +3429,7 @@ mod tests {
         let env: WsEnvelope = serde_json::from_str(json).unwrap();
         let msg = env.into_message().unwrap();
         match msg {
-            WsMessage::Unknown {
+            WsMessageV2::Unknown {
                 msg_type: WsMsgType::Unknown(value),
                 raw,
             } => {
@@ -3243,31 +3449,34 @@ mod tests {
             "msg":{
                 "market_ticker":"TEST",
                 "market_id":"1",
-                "price":1,
-                "yes_bid":1,
-                "yes_ask":2,
                 "price_dollars":"0.01",
                 "yes_bid_dollars":"0.01",
                 "yes_ask_dollars":"0.02",
-                "volume":0,
+                "yes_bid_size_fp":"1.00",
+                "yes_ask_size_fp":"2.00",
+                "last_trade_size_fp":"1.00",
                 "volume_fp":"0",
-                "open_interest":0,
                 "open_interest_fp":"0",
                 "dollar_volume":0,
                 "dollar_open_interest":0,
-                "ts":0
+                "ts":0,
+                "ts_ms":0,
+                "time":"1970-01-01T00:00:00Z"
             }
         }"#;
-        let msg = WsMessage::from_bytes(json.as_bytes()).unwrap();
-        assert!(matches!(msg, WsMessage::Data(WsDataMessage::Ticker { .. })));
+        let msg = WsMessageV2::from_bytes(json.as_bytes()).unwrap();
+        assert!(matches!(
+            msg,
+            WsMessageV2::Data(WsDataMessageV2::Ticker { .. })
+        ));
     }
 
     #[test]
     fn ws_message_from_bytes_unknown_type() {
         let json = r#"{"type":"mystery","msg":{"foo":1}}"#;
-        let msg = WsMessage::from_bytes(json.as_bytes()).unwrap();
+        let msg = WsMessageV2::from_bytes(json.as_bytes()).unwrap();
         match msg {
-            WsMessage::Unknown {
+            WsMessageV2::Unknown {
                 msg_type: WsMsgType::Unknown(value),
                 raw,
             } => {
@@ -3281,7 +3490,7 @@ mod tests {
     #[test]
     fn ws_message_from_bytes_invalid_json_exposes_raw_bytes_and_reason() {
         let raw = br#"{"type":"ticker","msg":{"market_ticker":"TEST"}"#;
-        let err = WsMessage::from_bytes(raw).expect_err("invalid JSON should fail");
+        let err = WsMessageV2::from_bytes(raw).expect_err("invalid JSON should fail");
         match err {
             KalshiError::Parse {
                 context,
@@ -3301,7 +3510,7 @@ mod tests {
     #[test]
     fn ws_message_from_bytes_payload_parse_error_exposes_raw_bytes_and_reason() {
         let raw = br#"{"type":"ticker","sid":1,"seq":2,"msg":{"market_ticker":"TEST"}}"#;
-        let err = WsMessage::from_bytes(raw).expect_err("invalid payload should fail");
+        let err = WsMessageV2::from_bytes(raw).expect_err("invalid payload should fail");
         assert_eq!(err.parse_context(), Some("websocket message payload"));
         assert_eq!(err.parse_raw_bytes(), Some(&raw[..]));
         let reason = err
@@ -3318,21 +3527,21 @@ mod tests {
             "seq":4,
             "msg":{
                 "trade_id":"t1",
-                "ticker":"TST",
-                "price":10,
-                "count":2,
+                "market_ticker":"TST",
                 "count_fp":"2",
-                "yes_price":10,
-                "no_price":90,
                 "yes_price_dollars":"0.10",
                 "no_price_dollars":"0.90",
                 "taker_side":"yes",
-                "created_time":"2024-01-01T00:00:00Z"
+                "ts":1704067200,
+                "ts_ms":1704067200000
             }
         }"#;
         let msg_ref = WsMessageRef::from_bytes(json.as_bytes()).unwrap();
         let msg = msg_ref.into_owned().unwrap();
-        assert!(matches!(msg, WsMessage::Data(WsDataMessage::Trade { .. })));
+        assert!(matches!(
+            msg,
+            WsMessageV2::Data(WsDataMessageV2::Trade { .. })
+        ));
     }
 
     #[test]
@@ -3344,19 +3553,19 @@ mod tests {
             "msg":{
                 "market_ticker":"TEST",
                 "market_id":"1",
-                "price":1,
-                "yes_bid":1,
-                "yes_ask":2,
                 "price_dollars":"0.01",
                 "yes_bid_dollars":"0.01",
                 "yes_ask_dollars":"0.02",
-                "volume":0,
+                "yes_bid_size_fp":"1.00",
+                "yes_ask_size_fp":"2.00",
+                "last_trade_size_fp":"1.00",
                 "volume_fp":"0",
-                "open_interest":0,
                 "open_interest_fp":"0",
                 "dollar_volume":0,
                 "dollar_open_interest":0,
-                "ts":0
+                "ts":0,
+                "ts_ms":0,
+                "time":"1970-01-01T00:00:00Z"
             }
         }"#;
         let raw = WsRawEvent::new(Bytes::from(json));
@@ -3385,21 +3594,19 @@ mod tests {
     #[test]
     fn ws_fill_side_action_parse() {
         let json = r#"{
-            "fill_id":"f",
             "trade_id":"t",
             "order_id":"o",
-            "ticker":"T",
-            "market_ticker":"M",
+            "market_ticker":"T",
             "side":"no",
             "action":"buy",
-            "count":1,
             "count_fp":"1",
-            "yes_price":1,
-            "no_price":2,
             "yes_price_dollars":"0.01",
-            "no_price_dollars":"0.02",
             "is_taker":true,
-            "fee_cost":"0.00"
+            "fee_cost":"0.00",
+            "ts":0,
+            "ts_ms":0,
+            "post_position_fp":"1.00",
+            "purchased_side":"yes"
         }"#;
         let fill: WsFill = serde_json::from_str(json).unwrap();
         assert!(matches!(fill.side, YesNo::No));
@@ -3408,7 +3615,7 @@ mod tests {
 
     #[test]
     fn validate_update_requires_exactly_one_sid_target() {
-        let both = WsUpdateSubscriptionParams {
+        let both = WsUpdateSubscriptionParamsV2 {
             action: WsUpdateAction::AddMarkets,
             sid: Some(1),
             sids: Some(vec![2]),
@@ -3417,10 +3624,11 @@ mod tests {
             market_id: None,
             market_ids: None,
             send_initial_snapshot: None,
+            skip_ticker_ack: None,
         };
         assert!(validate_update(&both).is_err());
 
-        let multi = WsUpdateSubscriptionParams {
+        let multi = WsUpdateSubscriptionParamsV2 {
             action: WsUpdateAction::AddMarkets,
             sid: None,
             sids: Some(vec![1, 2]),
@@ -3429,10 +3637,11 @@ mod tests {
             market_id: None,
             market_ids: None,
             send_initial_snapshot: None,
+            skip_ticker_ack: None,
         };
         assert!(validate_update(&multi).is_err());
 
-        let valid = WsUpdateSubscriptionParams {
+        let valid = WsUpdateSubscriptionParamsV2 {
             action: WsUpdateAction::DeleteMarkets,
             sid: Some(1),
             sids: None,
@@ -3441,22 +3650,23 @@ mod tests {
             market_id: None,
             market_ids: None,
             send_initial_snapshot: None,
+            skip_ticker_ack: None,
         };
         assert!(validate_update(&valid).is_ok());
     }
 
     #[test]
     fn validate_subscription_enforces_market_target_exclusivity() {
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             market_ticker: Some("A".to_string()),
             market_tickers: Some(vec!["B".to_string()]),
             ..Default::default()
         };
         assert!(validate_subscription(&params).is_err());
 
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             market_ticker: Some("A".to_string()),
             market_id: Some("uuid".to_string()),
             ..Default::default()

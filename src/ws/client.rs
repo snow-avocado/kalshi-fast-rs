@@ -2,9 +2,9 @@ use crate::auth::KalshiAuth;
 use crate::env::{KalshiEnvironment, WS_PATH};
 use crate::error::KalshiError;
 use crate::ws::types::{
-    WsEnvelope, WsListSubscriptionsCmd, WsMessage, WsRawEvent, WsSubscribeCmd,
-    WsSubscriptionParams, WsUnsubscribeCmd, WsUnsubscribeParams, WsUpdateSubscriptionCmd,
-    WsUpdateSubscriptionParams, validate_subscription, validate_update,
+    WsEnvelope, WsListSubscriptionsCmd, WsMessageV2, WsRawEvent, WsSubscribeCmd,
+    WsSubscriptionParamsV2, WsUnsubscribeCmd, WsUnsubscribeParamsV2, WsUpdateSubscriptionCmd,
+    WsUpdateSubscriptionParamsV2, validate_subscription, validate_update,
 };
 
 use futures::{SinkExt, StreamExt};
@@ -109,7 +109,7 @@ impl Default for WsReaderConfig {
 #[derive(Debug)]
 pub enum WsEvent {
     /// A parsed WebSocket message (data, ack, error, etc.).
-    Message(WsMessage),
+    Message(WsMessageV2),
     Raw(WsRawEvent),
     /// Connection was lost and successfully re-established.
     ///
@@ -146,24 +146,24 @@ impl WsEventReceiver {
 
 #[derive(Default)]
 struct SubscriptionTracker {
-    pending: HashMap<u64, WsSubscriptionParams>,
-    active: HashMap<u64, WsSubscriptionParams>,
+    pending: HashMap<u64, WsSubscriptionParamsV2>,
+    active: HashMap<u64, WsSubscriptionParamsV2>,
 }
 
 impl SubscriptionTracker {
-    fn record_subscribe_cmd(&mut self, id: u64, params: WsSubscriptionParams) {
+    fn record_subscribe_cmd(&mut self, id: u64, params: WsSubscriptionParamsV2) {
         self.pending.insert(id, params);
     }
 
-    fn handle_message(&mut self, msg: &WsMessage) {
+    fn handle_message(&mut self, msg: &WsMessageV2) {
         match msg {
-            WsMessage::Subscribed {
+            WsMessageV2::Subscribed {
                 id: Some(id),
                 sid: Some(sid),
             } => {
                 self.handle_subscribed(Some(*id), Some(*sid));
             }
-            WsMessage::Unsubscribed { sid: Some(sid), .. } => {
+            WsMessageV2::Unsubscribed { sid: Some(sid), .. } => {
                 self.handle_unsubscribed(Some(*sid));
             }
             _ => {}
@@ -190,7 +190,7 @@ impl SubscriptionTracker {
         self.active.remove(&sid);
     }
 
-    fn apply_update(&mut self, update: &WsUpdateSubscriptionParams) {
+    fn apply_update(&mut self, update: &WsUpdateSubscriptionParamsV2) {
         use crate::ws::types::WsUpdateAction;
 
         let sid = match update.target_sid() {
@@ -241,10 +241,13 @@ impl SubscriptionTracker {
         if let Some(value) = update.send_initial_snapshot {
             params.send_initial_snapshot = Some(value);
         }
+        if let Some(value) = update.skip_ticker_ack {
+            params.skip_ticker_ack = Some(value);
+        }
     }
 
-    fn prepare_resubscribe(&mut self) -> Vec<WsSubscriptionParams> {
-        let mut params: Vec<WsSubscriptionParams> = self.active.values().cloned().collect();
+    fn prepare_resubscribe(&mut self) -> Vec<WsSubscriptionParamsV2> {
+        let mut params: Vec<WsSubscriptionParamsV2> = self.active.values().cloned().collect();
         params.extend(self.pending.values().cloned());
         self.active.clear();
         self.pending.clear();
@@ -273,19 +276,12 @@ impl KalshiWsLowLevelClient {
     // Connection
     // -----------------------------------------------
 
-    /// Connect without auth (public channels only).
-    pub async fn connect(env: KalshiEnvironment) -> Result<Self, KalshiError> {
-        let (ws_stream, _resp) = connect_async(&env.ws_url)
-            .await
-            .map_err(|e| KalshiError::Ws(e.to_string()))?;
-
-        let (write, read) = ws_stream.split();
-        Ok(Self {
-            write,
-            read,
-            next_id: 1,
-            authenticated: false,
-        })
+    /// Connect without auth.
+    ///
+    /// Kalshi now requires authentication at WebSocket handshake time for all
+    /// connections, including subscriptions to public channels.
+    pub async fn connect(_env: KalshiEnvironment) -> Result<Self, KalshiError> {
+        Err(KalshiError::AuthRequired("WebSocket connection"))
     }
 
     /// Connect with auth headers so you can subscribe to private channels.
@@ -375,9 +371,12 @@ impl KalshiWsLowLevelClient {
 
     /// Subscribe to one or more channels. Returns the command `id`.
     ///
-    /// Private channels (e.g. [`WsChannel::Fill`](crate::WsChannel::Fill))
+    /// Private channels (e.g. [`WsChannelV2::Fill`](crate::WsChannelV2::Fill))
     /// require an authenticated connection — see [`connect_authenticated`](Self::connect_authenticated).
-    pub async fn subscribe(&mut self, params: WsSubscriptionParams) -> Result<u64, KalshiError> {
+    pub async fn subscribe_v2(
+        &mut self,
+        params: WsSubscriptionParamsV2,
+    ) -> Result<u64, KalshiError> {
         let needs_auth = params.channels.iter().any(|c| c.is_private());
         if needs_auth && !self.authenticated {
             return Err(KalshiError::AuthRequired(
@@ -407,7 +406,10 @@ impl KalshiWsLowLevelClient {
 
     ///
     /// Unsubscribe from one or more subscriptions by SID. Returns the command `id`.
-    pub async fn unsubscribe(&mut self, params: WsUnsubscribeParams) -> Result<u64, KalshiError> {
+    pub async fn unsubscribe_v2(
+        &mut self,
+        params: WsUnsubscribeParamsV2,
+    ) -> Result<u64, KalshiError> {
         if params.sids.is_empty() {
             return Err(KalshiError::InvalidParams(
                 "unsubscribe: at least one sid is required".to_string(),
@@ -433,9 +435,9 @@ impl KalshiWsLowLevelClient {
     }
 
     /// Update an existing subscription (e.g. change market tickers). Returns the command `id`.
-    pub async fn update_subscription(
+    pub async fn update_subscription_v2(
         &mut self,
-        params: WsUpdateSubscriptionParams,
+        params: WsUpdateSubscriptionParamsV2,
     ) -> Result<u64, KalshiError> {
         validate_update(&params)?;
 
@@ -488,13 +490,13 @@ impl KalshiWsLowLevelClient {
             .map_err(|source| KalshiError::parse_json("websocket envelope", &bytes, source))
     }
 
-    /// Read the next message and parse it into a typed [`WsMessage`].
+    /// Read the next message and parse it into a typed [`WsMessageV2`].
     ///
     /// Equivalent to calling [`next_envelope`](Self::next_envelope) followed
     /// by [`WsEnvelope::into_message`].
-    pub async fn next_message(&mut self) -> Result<WsMessage, KalshiError> {
+    pub async fn next_message_v2(&mut self) -> Result<WsMessageV2, KalshiError> {
         let bytes = self.next_json_bytes().await?;
-        WsMessage::from_bytes(&bytes)
+        WsMessageV2::from_bytes(&bytes)
     }
 
     /// Gracefully close the underlying WebSocket.
@@ -514,25 +516,30 @@ impl KalshiWsLowLevelClient {
 ///
 /// ```no_run
 /// use kalshi_fast::{
-///     KalshiEnvironment, KalshiWsClient, WsChannel,
-///     WsDataMessage, WsEvent, WsMessage, WsReconnectConfig, WsSubscriptionParams,
+///     KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2,
+///     WsDataMessageV2, WsEvent, WsMessageV2, WsReconnectConfig, WsSubscriptionParamsV2,
 /// };
 ///
 /// # async fn run() -> Result<(), kalshi_fast::KalshiError> {
-/// let mut ws = KalshiWsClient::connect(
+/// let auth = KalshiAuth::from_pem_file(
+///     std::env::var("KALSHI_KEY_ID").unwrap(),
+///     std::env::var("KALSHI_PRIVATE_KEY_PATH").unwrap(),
+/// )?;
+/// let mut ws = KalshiWsClient::connect_authenticated(
 ///     KalshiEnvironment::demo(),
+///     auth,
 ///     WsReconnectConfig::default(),
 /// ).await?;
 ///
-/// ws.subscribe(WsSubscriptionParams {
-///     channels: vec![WsChannel::Trade],
+/// ws.subscribe_v2(WsSubscriptionParamsV2 {
+///     channels: vec![WsChannelV2::Trade],
 ///     ..Default::default()
 /// }).await?;
 ///
 /// loop {
-///     match ws.next_event().await? {
-///         WsEvent::Message(WsMessage::Data(WsDataMessage::Trade { msg, .. })) => {
-///             println!("trade: {} @ {}", msg.ticker, msg.price.unwrap_or(0));
+///     match ws.next_event_v2().await? {
+///         WsEvent::Message(WsMessageV2::Data(WsDataMessageV2::Trade { msg, .. })) => {
+///             println!("trade: {} @ {}", msg.market_ticker, msg.yes_price_dollars);
 ///         }
 ///         WsEvent::Disconnected { .. } => break,
 ///         _ => {}
@@ -560,25 +567,15 @@ impl KalshiWsClient {
     // Connection
     // -----------------------------------------------
 
-    /// Connect without auth (public channels only).
+    /// Connect without auth.
+    ///
+    /// Kalshi now requires authentication at WebSocket handshake time for all
+    /// connections, including subscriptions to public channels.
     pub async fn connect(
-        env: KalshiEnvironment,
-        config: WsReconnectConfig,
+        _env: KalshiEnvironment,
+        _config: WsReconnectConfig,
     ) -> Result<Self, KalshiError> {
-        let client = KalshiWsLowLevelClient::connect(env.clone()).await?;
-        Ok(Self {
-            env,
-            auth: None,
-            client: Some(client),
-            config,
-            tracker: Arc::new(Mutex::new(SubscriptionTracker::default())),
-            reader: None,
-            outgoing: None,
-            shutdown: None,
-            reader_task: None,
-            reader_shutdown_timeout: Duration::from_secs(5),
-            next_id: 1,
-        })
+        Err(KalshiError::AuthRequired("WebSocket connection"))
     }
 
     /// Connect with auth headers for private channels.
@@ -630,7 +627,10 @@ impl KalshiWsClient {
     ///
     /// The subscription is tracked internally so it can be resubscribed
     /// automatically after a reconnect.
-    pub async fn subscribe(&mut self, params: WsSubscriptionParams) -> Result<u64, KalshiError> {
+    pub async fn subscribe_v2(
+        &mut self,
+        params: WsSubscriptionParamsV2,
+    ) -> Result<u64, KalshiError> {
         let needs_auth = params.channels.iter().any(|c| c.is_private());
         if needs_auth && self.auth.is_none() {
             return Err(KalshiError::AuthRequired(
@@ -660,7 +660,10 @@ impl KalshiWsClient {
     }
 
     /// Unsubscribe from one or more subscriptions by SID. Returns the command `id`.
-    pub async fn unsubscribe(&mut self, params: WsUnsubscribeParams) -> Result<u64, KalshiError> {
+    pub async fn unsubscribe_v2(
+        &mut self,
+        params: WsUnsubscribeParamsV2,
+    ) -> Result<u64, KalshiError> {
         if params.sids.is_empty() {
             return Err(KalshiError::InvalidParams(
                 "unsubscribe: at least one sid is required".to_string(),
@@ -688,9 +691,9 @@ impl KalshiWsClient {
     }
 
     /// Update an existing subscription (e.g. change market tickers). Returns the command `id`.
-    pub async fn update_subscription(
+    pub async fn update_subscription_v2(
         &mut self,
-        params: WsUpdateSubscriptionParams,
+        params: WsUpdateSubscriptionParamsV2,
     ) -> Result<u64, KalshiError> {
         validate_update(&params)?;
 
@@ -726,7 +729,7 @@ impl KalshiWsClient {
         Ok(id)
     }
 
-    pub async fn start_reader(
+    pub async fn start_reader_v2(
         &mut self,
         config: WsReaderConfig,
     ) -> Result<WsEventReceiver, KalshiError> {
@@ -835,7 +838,7 @@ impl KalshiWsClient {
     /// automatically attempts reconnection per [`WsReconnectConfig`],
     /// returning [`WsEvent::Reconnected`] on success or
     /// [`WsEvent::Disconnected`] when retries are exhausted.
-    pub async fn next_event(&mut self) -> Result<WsEvent, KalshiError> {
+    pub async fn next_event_v2(&mut self) -> Result<WsEvent, KalshiError> {
         if let Some(reader) = &self.reader {
             return reader
                 .next()
@@ -848,7 +851,7 @@ impl KalshiWsClient {
             .as_mut()
             .ok_or_else(|| KalshiError::Ws("websocket client not connected".to_string()))?;
 
-        match client.next_message().await {
+        match client.next_message_v2().await {
             Ok(msg) => {
                 let mut tracker = self.tracker.lock().await;
                 tracker.handle_message(&msg);
@@ -889,7 +892,7 @@ impl KalshiWsClient {
                 KalshiWsLowLevelClient::connect_authenticated(self.env.clone(), auth.clone())
                     .await?
             }
-            None => KalshiWsLowLevelClient::connect(self.env.clone()).await?,
+            None => return Err(KalshiError::AuthRequired("WebSocket connection")),
         };
         self.client = Some(new_client);
 
@@ -1054,7 +1057,7 @@ async fn handle_payload(
 ) -> Result<(), KalshiError> {
     match mode {
         WsReaderMode::Owned => {
-            let msg = WsMessage::from_bytes(&bytes)?;
+            let msg = WsMessageV2::from_bytes(&bytes)?;
             {
                 let mut tracker = tracker.lock().await;
                 tracker.handle_message(&msg);
@@ -1129,7 +1132,7 @@ async fn handle_reconnect(
                 Some(auth) => {
                     KalshiWsLowLevelClient::connect_authenticated(env.clone(), auth.clone()).await
                 }
-                None => KalshiWsLowLevelClient::connect(env.clone()).await,
+                None => Err(KalshiError::AuthRequired("WebSocket connection")),
             }
         };
         let reconnect = tokio::select! {
@@ -1150,7 +1153,7 @@ async fn handle_reconnect(
                     };
                     let mut resubscribe_err: Option<KalshiError> = None;
                     for p in params {
-                        match client.subscribe(p.clone()).await {
+                        match client.subscribe_v2(p.clone()).await {
                             Ok(id) => {
                                 let mut tracker = tracker.lock().await;
                                 tracker.record_subscribe_cmd(id, p);
@@ -1185,7 +1188,8 @@ async fn handle_reconnect(
 mod tests {
     use super::*;
     use crate::KalshiEnvironment;
-    use crate::ws::types::WsChannel;
+    use crate::auth::tests::load_test_auth;
+    use crate::ws::types::WsChannelV2;
     use serde_json::{Value, json};
     use tokio::net::TcpListener;
     use tokio::time::{Duration, Instant, timeout};
@@ -1193,29 +1197,55 @@ mod tests {
     use tokio_tungstenite::tungstenite::Message;
     use url::Url;
 
+    fn ticker_frame(market_ticker: &str, market_id: &str, sid: u64, seq: u64) -> String {
+        json!({
+            "type": "ticker",
+            "sid": sid,
+            "seq": seq,
+            "msg": {
+                "market_ticker": market_ticker,
+                "market_id": market_id,
+                "price_dollars": "0.01",
+                "yes_bid_dollars": "0.01",
+                "yes_ask_dollars": "0.02",
+                "yes_bid_size_fp": "1.00",
+                "yes_ask_size_fp": "2.00",
+                "last_trade_size_fp": "1.00",
+                "volume_fp": "0.00",
+                "open_interest_fp": "0.00",
+                "dollar_volume": 0,
+                "dollar_open_interest": 0,
+                "ts": 0,
+                "ts_ms": 0,
+                "time": "1970-01-01T00:00:00Z"
+            }
+        })
+        .to_string()
+    }
+
     #[test]
     fn private_channel_check() {
-        assert!(WsChannel::Fill.is_private());
-        assert!(WsChannel::OrderbookDelta.is_private());
-        assert!(WsChannel::MarketPositions.is_private());
-        assert!(WsChannel::Communications.is_private());
-        assert!(WsChannel::OrderGroupUpdates.is_private());
+        assert!(WsChannelV2::Fill.is_private());
+        assert!(WsChannelV2::OrderbookDelta.is_private());
+        assert!(WsChannelV2::MarketPositions.is_private());
+        assert!(WsChannelV2::Communications.is_private());
+        assert!(WsChannelV2::OrderGroupUpdates.is_private());
 
-        assert!(!WsChannel::Ticker.is_private());
-        assert!(!WsChannel::Trade.is_private());
-        assert!(!WsChannel::MarketLifecycleV2.is_private());
-        assert!(!WsChannel::Multivariate.is_private());
+        assert!(!WsChannelV2::Ticker.is_private());
+        assert!(!WsChannelV2::Trade.is_private());
+        assert!(!WsChannelV2::MarketLifecycleV2.is_private());
+        assert!(!WsChannelV2::Multivariate.is_private());
     }
 
     #[test]
     fn subscription_tracker_moves_pending_to_active() {
         let mut tracker = SubscriptionTracker::default();
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             ..Default::default()
         };
         tracker.record_subscribe_cmd(1, params.clone());
-        tracker.handle_message(&WsMessage::Subscribed {
+        tracker.handle_message(&WsMessageV2::Subscribed {
             id: Some(1),
             sid: Some(42),
         });
@@ -1228,12 +1258,12 @@ mod tests {
     #[test]
     fn subscription_tracker_prepare_resubscribe_clears_state() {
         let mut tracker = SubscriptionTracker::default();
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::Ticker],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
             ..Default::default()
         };
         tracker.record_subscribe_cmd(1, params.clone());
-        tracker.handle_message(&WsMessage::Subscribed {
+        tracker.handle_message(&WsMessageV2::Subscribed {
             id: Some(1),
             sid: Some(42),
         });
@@ -1249,14 +1279,14 @@ mod tests {
         use crate::ws::types::WsUpdateAction;
 
         let mut tracker = SubscriptionTracker::default();
-        let params = WsSubscriptionParams {
-            channels: vec![WsChannel::OrderbookDelta],
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
             market_tickers: Some(vec!["A".to_string()]),
             ..Default::default()
         };
         tracker.active.insert(10, params);
 
-        let update = WsUpdateSubscriptionParams {
+        let update = WsUpdateSubscriptionParamsV2 {
             action: WsUpdateAction::AddMarkets,
             sid: Some(10),
             sids: None,
@@ -1265,6 +1295,7 @@ mod tests {
             market_id: None,
             market_ids: None,
             send_initial_snapshot: Some(true),
+            skip_ticker_ack: Some(true),
         };
         tracker.apply_update(&update);
 
@@ -1284,6 +1315,7 @@ mod tests {
                 .contains(&"B".to_string())
         );
         assert_eq!(updated.send_initial_snapshot, Some(true));
+        assert_eq!(updated.skip_ticker_ack, Some(true));
     }
 
     #[tokio::test]
@@ -1294,26 +1326,26 @@ mod tests {
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("accept");
             let mut ws = accept_async(stream).await.expect("accept ws");
-            let msg1 = r#"{"type":"ticker","sid":1,"seq":1,"msg":{"market_ticker":"A","market_id":"1","price":1,"yes_bid":1,"yes_ask":2,"price_dollars":"0.01","yes_bid_dollars":"0.01","yes_ask_dollars":"0.02","volume":0,"volume_fp":"0","open_interest":0,"open_interest_fp":"0","dollar_volume":0,"dollar_open_interest":0,"ts":0}}"#;
-            let msg2 = r#"{"type":"ticker","sid":2,"seq":2,"msg":{"market_ticker":"B","market_id":"2","price":1,"yes_bid":1,"yes_ask":2,"price_dollars":"0.01","yes_bid_dollars":"0.01","yes_ask_dollars":"0.02","volume":0,"volume_fp":"0","open_interest":0,"open_interest_fp":"0","dollar_volume":0,"dollar_open_interest":0,"ts":0}}"#;
-            ws.send(Message::Text(msg1.to_string()))
+            ws.send(Message::Text(ticker_frame("A", "1", 1, 1)))
                 .await
                 .expect("send 1");
-            ws.send(Message::Text(msg2.to_string()))
+            ws.send(Message::Text(ticker_frame("B", "2", 2, 2)))
                 .await
                 .expect("send 2");
         });
 
+        let auth = load_test_auth();
         let env = KalshiEnvironment {
             rest_origin: Url::parse("http://127.0.0.1/").expect("url"),
             ws_url: format!("ws://{}", addr),
         };
-        let mut client = KalshiWsClient::connect(env, WsReconnectConfig::default())
-            .await
-            .expect("connect");
+        let mut client =
+            KalshiWsClient::connect_authenticated(env, auth, WsReconnectConfig::default())
+                .await
+                .expect("connect");
 
         let receiver = client
-            .start_reader(WsReaderConfig {
+            .start_reader_v2(WsReaderConfig {
                 buffer_size: 1,
                 mode: WsReaderMode::Owned,
             })
@@ -1343,20 +1375,19 @@ mod tests {
         let server = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("accept 1");
             let mut ws = accept_async(stream).await.expect("accept ws 1");
-            let msg1 = r#"{"type":"ticker","sid":1,"seq":1,"msg":{"market_ticker":"A","market_id":"1","price":1,"yes_bid":1,"yes_ask":2,"price_dollars":"0.01","yes_bid_dollars":"0.01","yes_ask_dollars":"0.02","volume":0,"volume_fp":"0","open_interest":0,"open_interest_fp":"0","dollar_volume":0,"dollar_open_interest":0,"ts":0}}"#;
-            ws.send(Message::Text(msg1.to_string()))
+            ws.send(Message::Text(ticker_frame("A", "1", 1, 1)))
                 .await
                 .expect("send 1");
             ws.close(None).await.expect("close 1");
 
             let (stream, _) = listener.accept().await.expect("accept 2");
             let mut ws = accept_async(stream).await.expect("accept ws 2");
-            let msg2 = r#"{"type":"ticker","sid":2,"seq":2,"msg":{"market_ticker":"B","market_id":"2","price":1,"yes_bid":1,"yes_ask":2,"price_dollars":"0.01","yes_bid_dollars":"0.01","yes_ask_dollars":"0.02","volume":0,"volume_fp":"0","open_interest":0,"open_interest_fp":"0","dollar_volume":0,"dollar_open_interest":0,"ts":0}}"#;
-            ws.send(Message::Text(msg2.to_string()))
+            ws.send(Message::Text(ticker_frame("B", "2", 2, 2)))
                 .await
                 .expect("send 2");
         });
 
+        let auth = load_test_auth();
         let env = KalshiEnvironment {
             rest_origin: Url::parse("http://127.0.0.1/").expect("url"),
             ws_url: format!("ws://{}", addr),
@@ -1368,10 +1399,12 @@ mod tests {
             jitter: 0.0,
             resubscribe: false,
         };
-        let mut client = KalshiWsClient::connect(env, config).await.expect("connect");
+        let mut client = KalshiWsClient::connect_authenticated(env, auth, config)
+            .await
+            .expect("connect");
 
         let receiver = client
-            .start_reader(WsReaderConfig {
+            .start_reader_v2(WsReaderConfig {
                 buffer_size: 4,
                 mode: WsReaderMode::Owned,
             })
@@ -1419,13 +1452,16 @@ mod tests {
             assert_eq!(payload["params"]["sids"], json!([7, 9]));
         });
 
+        let auth = load_test_auth();
         let env = KalshiEnvironment {
             rest_origin: Url::parse("http://127.0.0.1/").expect("url"),
             ws_url: format!("ws://{}", addr),
         };
-        let mut client = KalshiWsLowLevelClient::connect(env).await.expect("connect");
+        let mut client = KalshiWsLowLevelClient::connect_authenticated(env, auth)
+            .await
+            .expect("connect");
         client
-            .unsubscribe(WsUnsubscribeParams { sids: vec![7, 9] })
+            .unsubscribe_v2(WsUnsubscribeParamsV2 { sids: vec![7, 9] })
             .await
             .expect("unsubscribe");
 
@@ -1443,6 +1479,7 @@ mod tests {
             let _ = ws.close(None).await;
         });
 
+        let auth = load_test_auth();
         let env = KalshiEnvironment {
             rest_origin: Url::parse("http://127.0.0.1/").expect("url"),
             ws_url: format!("ws://{}", addr),
@@ -1454,10 +1491,12 @@ mod tests {
             jitter: 0.0,
             resubscribe: false,
         };
-        let mut client = KalshiWsClient::connect(env, config).await.expect("connect");
+        let mut client = KalshiWsClient::connect_authenticated(env, auth, config)
+            .await
+            .expect("connect");
 
         client
-            .start_reader(WsReaderConfig {
+            .start_reader_v2(WsReaderConfig {
                 buffer_size: 4,
                 mode: WsReaderMode::Owned,
             })

@@ -1,3 +1,7 @@
+---
+name: kalshi-refresh
+description: Use this repo-local skill for recurring refreshes of `kalshi-fast-rs` against Kalshi's current published docs and changelog.
+---
 # Kalshi Refresh
 
 Use this repo-local skill for recurring refreshes of `kalshi-fast-rs` against

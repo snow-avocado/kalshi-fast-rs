@@ -87,7 +87,8 @@ Repo refresh automations should:
 1. Read `AGENTS.md`, this file, and the active `CHANGELOG.md` entry.
 2. Check the Kalshi source-of-truth docs: `llms.txt`, changelog RSS, OpenAPI, and AsyncAPI.
 3. Classify upstream changes as breaking or non-breaking.
-4. Refresh local snapshots and parity artifacts.
+4. Update `docs/spec-parity.md` when there is a spec-to-crate distinction
+   worth documenting.
 5. Remove or update stale deprecated endpoints, API shapes, fields, and tests.
 6. Propose the version bump using the rules above.
 7. Update `CHANGELOG.md`, README, and crate docs if the public contract or compatibility statement changed.

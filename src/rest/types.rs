@@ -5,7 +5,7 @@ use crate::types::{
     SelfTradePreventionType, TimeInForce, TradeTakerSide, YesNo, deserialize_null_as_empty_vec,
     deserialize_string_or_number, serialize_csv_opt,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 use std::fmt;
 
@@ -217,6 +217,8 @@ pub struct EventData {
     pub strike_period: Option<String>,
     #[serde(default)]
     pub last_updated_ts: Option<String>,
+    #[serde(default)]
+    pub occurrence_datetime: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
@@ -577,6 +579,8 @@ pub struct Market {
     #[serde(default)]
     pub expiration_value: Option<String>,
     #[serde(default)]
+    pub occurrence_datetime: Option<String>,
+    #[serde(default)]
     pub tick_size: Option<i64>,
     #[serde(default)]
     pub settlement_value: Option<i64>,
@@ -783,7 +787,7 @@ pub struct GetMarketResponse {
 
 /// --- Orderbook ---
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Orderbook {
     /// Price levels: (price_cents, quantity)
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
@@ -799,7 +803,7 @@ pub struct Orderbook {
     pub no_dollars: Vec<(FixedPointDollars, i64)>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OrderbookFp {
     /// Price levels: (price_dollars, quantity_fp)
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
@@ -815,11 +819,27 @@ pub struct GetMarketOrderbookParams {
     pub depth: Option<u32>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GetMarketOrderbookResponse {
     pub orderbook: Orderbook,
-    #[serde(default)]
-    pub orderbook_fp: Option<OrderbookFp>,
+    pub orderbook_fp: OrderbookFp,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct GetMarketOrderbooksParams {
+    pub tickers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MarketOrderbookFp {
+    pub ticker: String,
+    pub orderbook_fp: OrderbookFp,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetMarketOrderbooksResponse {
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    pub orderbooks: Vec<MarketOrderbookFp>,
 }
 
 /// --- Trades ---
@@ -1438,10 +1458,10 @@ pub struct Fill {
     pub yes_price: Option<i64>,
     #[serde(default)]
     pub no_price: Option<i64>,
-    #[serde(default, alias = "yes_price_dollars")]
-    pub yes_price_fixed: Option<FixedPointDollars>,
-    #[serde(default, alias = "no_price_dollars")]
-    pub no_price_fixed: Option<FixedPointDollars>,
+    #[serde(default, alias = "yes_price_fixed")]
+    pub yes_price_dollars: Option<FixedPointDollars>,
+    #[serde(default, alias = "no_price_fixed")]
+    pub no_price_dollars: Option<FixedPointDollars>,
     #[serde(default)]
     pub side: Option<YesNo>,
     #[serde(default)]
@@ -1498,14 +1518,14 @@ pub struct Settlement {
     pub yes_count: Option<i64>,
     #[serde(default)]
     pub yes_count_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub yes_total_cost: Option<FixedPointDollars>,
+    #[serde(default, alias = "yes_total_cost")]
+    pub yes_total_cost_dollars: Option<FixedPointDollars>,
     #[serde(default)]
     pub no_count: Option<i64>,
     #[serde(default)]
     pub no_count_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub no_total_cost: Option<FixedPointDollars>,
+    #[serde(default, alias = "no_total_cost")]
+    pub no_total_cost_dollars: Option<FixedPointDollars>,
     #[serde(default)]
     pub revenue: Option<FixedPointDollars>,
     #[serde(default)]
@@ -1721,6 +1741,10 @@ pub struct Quote {
     pub rfq_creator_order_id: Option<String>,
     #[serde(default)]
     pub creator_order_id: Option<String>,
+    #[serde(default)]
+    pub yes_contracts_fp: Option<FixedPointCount>,
+    #[serde(default)]
+    pub no_contracts_fp: Option<FixedPointCount>,
     #[serde(default, flatten)]
     pub extra: Map<String, Value>,
 }
@@ -1986,6 +2010,12 @@ pub struct GetLiveDataResponse {
     pub live_data: LiveData,
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct GetLiveDataByMilestoneParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include_player_stats: Option<bool>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LiveData {
     #[serde(rename = "type")]
@@ -1993,6 +2023,14 @@ pub struct LiveData {
     #[serde(default)]
     pub details: Map<String, Value>,
     pub milestone_id: String,
+    #[serde(default, flatten)]
+    pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetGameStatsResponse {
+    #[serde(default)]
+    pub pbp: Option<Value>,
     #[serde(default, flatten)]
     pub extra: Map<String, Value>,
 }
@@ -2069,9 +2107,11 @@ pub struct MarketCandlestick {
     pub yes_bid: BidAskDistribution,
     pub yes_ask: BidAskDistribution,
     pub price: PriceDistribution,
-    pub volume: i64,
+    #[serde(default)]
+    pub volume: Option<i64>,
     pub volume_fp: FixedPointCount,
-    pub open_interest: i64,
+    #[serde(default)]
+    pub open_interest: Option<i64>,
     pub open_interest_fp: FixedPointCount,
 }
 
@@ -2495,6 +2535,8 @@ pub struct GetHistoricalMarketsParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_ticker: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub series_ticker: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mve_filter: Option<MveFilter>,
 }
 
@@ -2697,4 +2739,86 @@ pub struct SubaccountNettingConfig {
 pub struct GetSubaccountNettingResponse {
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
     pub netting_configs: Vec<SubaccountNettingConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GetMarketOrderbookResponseWire {
+    #[serde(default)]
+    orderbook: Option<Orderbook>,
+    #[serde(default)]
+    orderbook_fp: Option<OrderbookFp>,
+}
+
+fn dollars_to_cents(value: &str) -> Option<i64> {
+    let (whole, frac) = value.split_once('.').unwrap_or((value, "0"));
+    let mut cents = frac.chars().take(2).collect::<String>();
+    while cents.len() < 2 {
+        cents.push('0');
+    }
+    Some(whole.parse::<i64>().ok()? * 100 + cents.parse::<i64>().ok()?)
+}
+
+fn fixed_point_count_to_i64(value: &str) -> Option<i64> {
+    value.split('.').next()?.parse::<i64>().ok()
+}
+
+fn synthesize_orderbook_from_fp(orderbook_fp: &OrderbookFp) -> Orderbook {
+    let convert = |levels: &[(FixedPointDollars, String)]| {
+        levels
+            .iter()
+            .filter_map(|(price, count)| {
+                Some((dollars_to_cents(price)?, fixed_point_count_to_i64(count)?))
+            })
+            .collect::<Vec<_>>()
+    };
+
+    Orderbook {
+        yes: convert(&orderbook_fp.yes_dollars),
+        no: convert(&orderbook_fp.no_dollars),
+        yes_dollars: orderbook_fp
+            .yes_dollars
+            .iter()
+            .filter_map(|(price, count)| Some((price.clone(), fixed_point_count_to_i64(count)?)))
+            .collect(),
+        no_dollars: orderbook_fp
+            .no_dollars
+            .iter()
+            .filter_map(|(price, count)| Some((price.clone(), fixed_point_count_to_i64(count)?)))
+            .collect(),
+    }
+}
+
+fn synthesize_orderbook_fp(orderbook: &Orderbook) -> OrderbookFp {
+    let convert = |levels: &[(FixedPointDollars, i64)]| {
+        levels
+            .iter()
+            .map(|(price, count)| (price.clone(), format!("{count}.00")))
+            .collect::<Vec<_>>()
+    };
+
+    OrderbookFp {
+        yes_dollars: convert(&orderbook.yes_dollars),
+        no_dollars: convert(&orderbook.no_dollars),
+    }
+}
+
+impl<'de> Deserialize<'de> for GetMarketOrderbookResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = GetMarketOrderbookResponseWire::deserialize(deserializer)?;
+        let orderbook_fp = wire
+            .orderbook_fp
+            .or_else(|| wire.orderbook.as_ref().map(synthesize_orderbook_fp))
+            .unwrap_or_default();
+        let orderbook = wire
+            .orderbook
+            .unwrap_or_else(|| synthesize_orderbook_from_fp(&orderbook_fp));
+
+        Ok(Self {
+            orderbook,
+            orderbook_fp,
+        })
+    }
 }

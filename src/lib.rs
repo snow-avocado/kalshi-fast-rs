@@ -11,7 +11,7 @@
 
 //! ## Features
 //!
-//! - **OpenAPI parity** — full REST operation coverage for the current docs snapshot
+//! - **OpenAPI parity** — full REST operation coverage for the current published docs
 //! - **AsyncAPI parity** — WebSocket commands, responses, and `user_orders`
 //! - **Pagination helpers** — page-level ([`CursorPager`]) and item-level (`stream_*`) iteration
 //! - **REST reliability controls** — retry/backoff/jitter with `429 Retry-After` support
@@ -48,8 +48,8 @@
 //!
 //! ```no_run
 //! use kalshi_fast::{
-//!     KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannel,
-//!     WsDataMessage, WsEvent, WsMessage, WsReconnectConfig, WsSubscriptionParams,
+//!     KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2,
+//!     WsDataMessageV2, WsEvent, WsMessageV2, WsReconnectConfig, WsSubscriptionParamsV2,
 //! };
 //!
 //! # async fn run() -> Result<(), kalshi_fast::KalshiError> {
@@ -64,14 +64,14 @@
 //!     WsReconnectConfig::default(),
 //! ).await?;
 //!
-//! ws.subscribe(WsSubscriptionParams {
-//!     channels: vec![WsChannel::UserOrders],
+//! ws.subscribe_v2(WsSubscriptionParamsV2 {
+//!     channels: vec![WsChannelV2::UserOrders],
 //!     ..Default::default()
 //! }).await?;
 //!
 //! loop {
-//!     match ws.next_event().await? {
-//!         WsEvent::Message(WsMessage::Data(WsDataMessage::UserOrder { msg, .. })) => {
+//!     match ws.next_event_v2().await? {
+//!         WsEvent::Message(WsMessageV2::Data(WsDataMessageV2::UserOrder { msg, .. })) => {
 //!             println!("order={} status={:?}", msg.order_id, msg.status);
 //!         }
 //!         WsEvent::Reconnected { attempt } => println!("Reconnected (attempt {})", attempt),
@@ -167,6 +167,31 @@
 //! - **Deferred JSON parsing** — uses `serde_json::RawValue` to skip parsing unused fields
 //! - **Zero-copy message parsing** — binary WebSocket frames parsed with `from_slice`
 //! - **Split read/write streams** — no lock contention on WebSocket operations
+//!
+//! ## Reference Documents
+//!
+//! This crate follows Kalshi's published API descriptions. These documents are
+//! the canonical references when checking endpoint coverage, payload shapes, and
+//! recent platform changes:
+//!
+//! - `llms.txt`: <https://docs.kalshi.com/llms.txt>
+//!   - index of the current Kalshi documentation set
+//! - changelog RSS: <https://docs.kalshi.com/changelog/rss.xml>
+//!   - feed of recent documentation and contract updates
+//! - OpenAPI: <https://docs.kalshi.com/openapi.yaml>
+//!   - authoritative description of the REST API
+//! - AsyncAPI: <https://docs.kalshi.com/asyncapi.yaml>
+//!   - authoritative description of the WebSocket API
+//!
+//! Short notes on known spec-to-crate distinctions live in
+//! `docs/spec-parity.md`.
+//!
+//! Release history is documented in
+//! [`CHANGELOG.md`](https://github.com/PoorRican/kalshi-fast-rs/blob/main/CHANGELOG.md),
+//! and crate versioning policy is documented in
+//! [`VERSIONING.md`](https://github.com/PoorRican/kalshi-fast-rs/blob/main/VERSIONING.md).
+//! Together they describe both public Rust API changes and upstream Kalshi
+//! contract alignment.
 
 pub mod auth;
 pub mod env;

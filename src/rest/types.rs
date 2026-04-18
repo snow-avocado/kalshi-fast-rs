@@ -5,7 +5,7 @@ use crate::types::{
     SelfTradePreventionType, TimeInForce, TradeTakerSide, YesNo, deserialize_null_as_empty_vec,
     deserialize_string_or_number, serialize_csv_opt,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::fmt;
 
@@ -788,22 +788,6 @@ pub struct GetMarketResponse {
 /// --- Orderbook ---
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct Orderbook {
-    /// Price levels: (price_cents, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub yes: Vec<(i64, i64)>,
-    /// Price levels: (price_cents, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub no: Vec<(i64, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub yes_dollars: Vec<(FixedPointDollars, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub no_dollars: Vec<(FixedPointDollars, i64)>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OrderbookFp {
     /// Price levels: (price_dollars, quantity_fp)
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
@@ -819,9 +803,8 @@ pub struct GetMarketOrderbookParams {
     pub depth: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetMarketOrderbookResponse {
-    pub orderbook: Orderbook,
     pub orderbook_fp: OrderbookFp,
 }
 
@@ -2366,13 +2349,6 @@ pub struct GetOrderQueuePositionsParams {
 
 impl GetOrderQueuePositionsParams {
     pub fn validate(&self) -> Result<(), KalshiError> {
-        if self.market_tickers.is_none() && self.event_ticker.is_none() {
-            return Err(KalshiError::InvalidParams(
-                "GET /portfolio/orders/queue_positions: market_tickers or event_ticker is required"
-                    .to_string(),
-            ));
-        }
-
         Ok(())
     }
 }
@@ -2652,86 +2628,4 @@ pub struct SubaccountNettingConfig {
 pub struct GetSubaccountNettingResponse {
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
     pub netting_configs: Vec<SubaccountNettingConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GetMarketOrderbookResponseWire {
-    #[serde(default)]
-    orderbook: Option<Orderbook>,
-    #[serde(default)]
-    orderbook_fp: Option<OrderbookFp>,
-}
-
-fn dollars_to_cents(value: &str) -> Option<i64> {
-    let (whole, frac) = value.split_once('.').unwrap_or((value, "0"));
-    let mut cents = frac.chars().take(2).collect::<String>();
-    while cents.len() < 2 {
-        cents.push('0');
-    }
-    Some(whole.parse::<i64>().ok()? * 100 + cents.parse::<i64>().ok()?)
-}
-
-fn fixed_point_count_to_i64(value: &str) -> Option<i64> {
-    value.split('.').next()?.parse::<i64>().ok()
-}
-
-fn synthesize_orderbook_from_fp(orderbook_fp: &OrderbookFp) -> Orderbook {
-    let convert = |levels: &[(FixedPointDollars, String)]| {
-        levels
-            .iter()
-            .filter_map(|(price, count)| {
-                Some((dollars_to_cents(price)?, fixed_point_count_to_i64(count)?))
-            })
-            .collect::<Vec<_>>()
-    };
-
-    Orderbook {
-        yes: convert(&orderbook_fp.yes_dollars),
-        no: convert(&orderbook_fp.no_dollars),
-        yes_dollars: orderbook_fp
-            .yes_dollars
-            .iter()
-            .filter_map(|(price, count)| Some((price.clone(), fixed_point_count_to_i64(count)?)))
-            .collect(),
-        no_dollars: orderbook_fp
-            .no_dollars
-            .iter()
-            .filter_map(|(price, count)| Some((price.clone(), fixed_point_count_to_i64(count)?)))
-            .collect(),
-    }
-}
-
-fn synthesize_orderbook_fp(orderbook: &Orderbook) -> OrderbookFp {
-    let convert = |levels: &[(FixedPointDollars, i64)]| {
-        levels
-            .iter()
-            .map(|(price, count)| (price.clone(), format!("{count}.00")))
-            .collect::<Vec<_>>()
-    };
-
-    OrderbookFp {
-        yes_dollars: convert(&orderbook.yes_dollars),
-        no_dollars: convert(&orderbook.no_dollars),
-    }
-}
-
-impl<'de> Deserialize<'de> for GetMarketOrderbookResponse {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let wire = GetMarketOrderbookResponseWire::deserialize(deserializer)?;
-        let orderbook_fp = wire
-            .orderbook_fp
-            .or_else(|| wire.orderbook.as_ref().map(synthesize_orderbook_fp))
-            .unwrap_or_default();
-        let orderbook = wire
-            .orderbook
-            .unwrap_or_else(|| synthesize_orderbook_from_fp(&orderbook_fp));
-
-        Ok(Self {
-            orderbook,
-            orderbook_fp,
-        })
-    }
 }

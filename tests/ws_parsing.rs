@@ -539,10 +539,9 @@ fn ws_quote_created_message_parses() {
             "rfq_id": "rfq-1",
             "quote_creator_id": "creator",
             "market_ticker": "FED-23DEC-T3.00",
-            "yes_bid": 50,
-            "no_bid": 50,
             "yes_bid_dollars": "0.50",
             "no_bid_dollars": "0.50",
+            "yes_contracts_offered_fp": "100.00",
             "created_ts": "2024-12-01T10:06:00Z"
         }
     }"#;
@@ -553,7 +552,8 @@ fn ws_quote_created_message_parses() {
         WsMessageV2::Data(WsDataMessageV2::Communications { msg, .. }) => match msg {
             WsCommunications::QuoteCreated(quote) => {
                 assert_eq!(quote.quote_id, "q-1");
-                assert_eq!(quote.yes_bid, 50);
+                assert_eq!(quote.yes_bid_dollars, "0.50");
+                assert_eq!(quote.yes_contracts_offered_fp.as_deref(), Some("100.00"));
             }
             other => panic!("unexpected communications payload: {:?}", other),
         },
@@ -570,12 +570,10 @@ fn ws_quote_accepted_message_parses() {
             "rfq_id": "rfq-2",
             "quote_creator_id": "creator",
             "market_ticker": "FED-23DEC-T3.00",
-            "yes_bid": 51,
-            "no_bid": 49,
             "yes_bid_dollars": "0.51",
             "no_bid_dollars": "0.49",
             "accepted_side": "yes",
-            "contracts_accepted": 10
+            "contracts_accepted_fp": "10.00"
         }
     }"#;
 
@@ -586,7 +584,7 @@ fn ws_quote_accepted_message_parses() {
             WsCommunications::QuoteAccepted(quote) => {
                 assert_eq!(quote.quote_id, "q-2");
                 assert!(matches!(quote.accepted_side, Some(YesNo::Yes)));
-                assert_eq!(quote.contracts_accepted, Some(10));
+                assert_eq!(quote.contracts_accepted_fp.as_deref(), Some("10.00"));
             }
             other => panic!("unexpected communications payload: {:?}", other),
         },

@@ -1,6 +1,6 @@
 [package]
 name = "kalshi-fast-rs"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2024"
 description = "High-performance async Rust client for Kalshi prediction markets API with full WebSocket support"
 license = "MIT"
@@ -48,7 +48,6 @@ httpdate = "1"
 anyhow = "1"
 dotenvy = "0.15"
 chrono = "0.4"
-serde_yaml = "0.9"
 
 [dev-dependencies.cargo-husky]
 version = "1"

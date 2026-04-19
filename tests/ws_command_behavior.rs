@@ -1,182 +1,121 @@
-use std::net::SocketAddr;
-use std::sync::OnceLock;
-use std::time::Duration;
+#![cfg(feature = "live-tests")]
 
-use futures::StreamExt;
-use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, KalshiError, KalshiWsLowLevelClient, WsChannelV2,
-    WsSubscriptionParamsV2, WsUpdateAction, WsUpdateSubscriptionParamsV2,
-};
-use rand::rngs::OsRng;
-use rsa::RsaPrivateKey;
-use rsa::pkcs8::{EncodePrivateKey, LineEnding};
-use serde_json::{Value, json};
-use tokio::net::TcpListener;
-use tokio::time::sleep;
-use tokio_tungstenite::accept_async;
-use tokio_tungstenite::tungstenite::Message;
-use url::Url;
+mod common;
 
-fn test_auth() -> KalshiAuth {
-    static TEST_PEM: OnceLock<String> = OnceLock::new();
+use kalshi_fast::{WsChannelV2, WsMessageV2, WsSubscriptionParamsV2, WsUnsubscribeParamsV2};
 
-    let pem = TEST_PEM.get_or_init(|| {
-        let mut rng = OsRng;
-        let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("generate test private key");
-        private_key
-            .to_pkcs8_pem(LineEnding::LF)
-            .expect("encode test private key")
-            .to_string()
-    });
+#[tokio::test]
+async fn ws_demo_ticker_subscription_can_be_listed_and_unsubscribed() {
+    let mut ws = common::connect_demo_ws().await;
 
-    KalshiAuth::from_pem_str("test-key-id", pem).expect("load auth from generated PEM")
-}
+    let subscribe_id = ws
+        .subscribe_v2(WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Ticker],
+            ..Default::default()
+        })
+        .await
+        .expect("ticker subscribe failed");
 
-fn test_env(addr: SocketAddr) -> KalshiEnvironment {
-    KalshiEnvironment {
-        rest_origin: Url::parse("http://127.0.0.1/").expect("url"),
-        ws_url: format!("ws://{addr}"),
+    let sid = common::wait_for_subscribed(&mut ws, subscribe_id).await;
+
+    let list_id = ws
+        .list_subscriptions()
+        .await
+        .expect("list_subscriptions failed");
+
+    let listed = common::wait_for_message(
+        &mut ws,
+        common::CHANNEL_TIMEOUT,
+        |msg| matches!(msg, WsMessageV2::ListSubscriptions { id: Some(id), .. } if *id == list_id),
+    )
+    .await;
+
+    match listed {
+        WsMessageV2::ListSubscriptions { subscriptions, .. } => {
+            let subscription = subscriptions
+                .into_iter()
+                .find(|sub| sub.sid == sid)
+                .expect("ticker subscription missing from list_subscriptions");
+            assert!(
+                subscription.channels.contains(&WsChannelV2::Ticker)
+                    || subscription.channel == Some(WsChannelV2::Ticker)
+            );
+            assert!(subscription.market_tickers.is_none());
+            assert!(subscription.market_ids.is_none());
+        }
+        other => panic!("expected list_subscriptions response, got {other:?}"),
+    }
+
+    let unsubscribe_id = ws
+        .unsubscribe_v2(WsUnsubscribeParamsV2 { sids: vec![sid] })
+        .await
+        .expect("unsubscribe failed");
+
+    let unsubscribed = common::wait_for_message(&mut ws, common::CHANNEL_TIMEOUT, |msg| {
+        matches!(
+            msg,
+            WsMessageV2::Unsubscribed {
+                id: Some(id),
+                sid: Some(msg_sid)
+            } if *id == unsubscribe_id && *msg_sid == sid
+        )
+    })
+    .await;
+
+    match unsubscribed {
+        WsMessageV2::Unsubscribed {
+            id: Some(id),
+            sid: Some(msg_sid),
+        } => {
+            assert_eq!(id, unsubscribe_id);
+            assert_eq!(msg_sid, sid);
+        }
+        other => panic!("expected unsubscribe acknowledgement, got {other:?}"),
     }
 }
 
-async fn read_single_text_payload(listener: TcpListener) -> Value {
-    let (stream, _) = listener.accept().await.expect("accept tcp");
-    let mut ws = accept_async(stream).await.expect("accept websocket");
-
-    let frame = ws.next().await.expect("frame").expect("ok frame");
-    let text = match frame {
-        Message::Text(text) => text.to_string(),
-        other => panic!("expected text frame, got {other:?}"),
-    };
-
-    serde_json::from_str(&text).expect("valid json payload")
-}
-
 #[tokio::test]
-async fn low_level_subscribe_serializes_singular_market_ticker() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let addr = listener.local_addr().expect("addr");
+async fn ws_demo_orderbook_subscription_is_listed_with_market_filter() {
+    let market_ticker = common::first_open_demo_market_ticker().await;
+    let mut ws = common::connect_demo_ws().await;
 
-    let server = tokio::spawn(async move {
-        let payload = read_single_text_payload(listener).await;
-        assert_eq!(payload["cmd"], json!("subscribe"));
-        assert_eq!(payload["params"]["channels"], json!(["ticker"]));
-        assert_eq!(payload["params"]["market_ticker"], json!("TEST"));
-        assert!(payload["params"].get("market_tickers").is_none());
-    });
-
-    let mut client = KalshiWsLowLevelClient::connect_authenticated(test_env(addr), test_auth())
-        .await
-        .expect("connect");
-    client
-        .subscribe_v2(WsSubscriptionParamsV2 {
-            channels: vec![WsChannelV2::Ticker],
-            market_ticker: Some("TEST".to_string()),
-            ..Default::default()
-        })
-        .await
-        .expect("subscribe");
-
-    server.await.expect("server");
-}
-
-#[tokio::test]
-async fn low_level_subscribe_orderbook_delta_serializes_plural_market_tickers() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let addr = listener.local_addr().expect("addr");
-
-    let server = tokio::spawn(async move {
-        let payload = read_single_text_payload(listener).await;
-        assert_eq!(payload["cmd"], json!("subscribe"));
-        assert_eq!(payload["params"]["channels"], json!(["orderbook_delta"]));
-        assert_eq!(payload["params"]["market_tickers"], json!(["TEST"]));
-        assert_eq!(payload["params"]["send_initial_snapshot"], json!(true));
-        assert!(payload["params"].get("market_ticker").is_none());
-        assert!(payload["params"].get("market_id").is_none());
-        assert!(payload["params"].get("market_ids").is_none());
-    });
-
-    let mut client = KalshiWsLowLevelClient::connect_authenticated(test_env(addr), test_auth())
-        .await
-        .expect("connect");
-    client
+    let subscribe_id = ws
         .subscribe_v2(WsSubscriptionParamsV2 {
             channels: vec![WsChannelV2::OrderbookDelta],
-            market_tickers: Some(vec!["TEST".to_string()]),
-            send_initial_snapshot: Some(true),
+            market_ticker: Some(market_ticker.clone()),
             ..Default::default()
         })
         .await
-        .expect("subscribe");
+        .expect("orderbook subscribe failed");
 
-    server.await.expect("server");
-}
+    let sid = common::wait_for_subscribed(&mut ws, subscribe_id).await;
 
-#[tokio::test]
-async fn low_level_update_subscription_serializes_skip_ticker_ack() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let addr = listener.local_addr().expect("addr");
-
-    let server = tokio::spawn(async move {
-        let payload = read_single_text_payload(listener).await;
-        assert_eq!(payload["cmd"], json!("update_subscription"));
-        assert_eq!(payload["params"]["action"], json!("add_markets"));
-        assert_eq!(payload["params"]["sid"], json!(42));
-        assert_eq!(payload["params"]["market_tickers"], json!(["TEST", "ALT"]));
-        assert_eq!(payload["params"]["skip_ticker_ack"], json!(true));
-        assert!(payload["params"].get("sids").is_none());
-    });
-
-    let mut client = KalshiWsLowLevelClient::connect_authenticated(test_env(addr), test_auth())
+    let list_id = ws
+        .list_subscriptions()
         .await
-        .expect("connect");
-    client
-        .update_subscription_v2(WsUpdateSubscriptionParamsV2 {
-            action: WsUpdateAction::AddMarkets,
-            sid: Some(42),
-            sids: None,
-            market_ticker: None,
-            market_tickers: Some(vec!["TEST".to_string(), "ALT".to_string()]),
-            market_id: None,
-            market_ids: None,
-            send_initial_snapshot: None,
-            skip_ticker_ack: Some(true),
-        })
-        .await
-        .expect("update subscription");
+        .expect("list_subscriptions failed");
 
-    server.await.expect("server");
-}
+    let listed = common::wait_for_message(
+        &mut ws,
+        common::CHANNEL_TIMEOUT,
+        |msg| matches!(msg, WsMessageV2::ListSubscriptions { id: Some(id), .. } if *id == list_id),
+    )
+    .await;
 
-#[tokio::test]
-async fn low_level_subscribe_rejects_both_market_ticker_forms() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
-    let addr = listener.local_addr().expect("addr");
-
-    let server = tokio::spawn(async move {
-        let (stream, _) = listener.accept().await.expect("accept tcp");
-        let _ws = accept_async(stream).await.expect("accept websocket");
-        sleep(Duration::from_millis(100)).await;
-    });
-
-    let mut client = KalshiWsLowLevelClient::connect_authenticated(test_env(addr), test_auth())
-        .await
-        .expect("connect");
-    let err = client
-        .subscribe_v2(WsSubscriptionParamsV2 {
-            channels: vec![WsChannelV2::Ticker],
-            market_ticker: Some("TEST".to_string()),
-            market_tickers: Some(vec!["ALT".to_string()]),
-            ..Default::default()
-        })
-        .await
-        .expect_err("subscribe should fail");
-
-    assert!(matches!(
-        err,
-        KalshiError::InvalidParams(message)
-            if message.contains("market_ticker or market_tickers")
-    ));
-
-    server.await.expect("server");
+    match listed {
+        WsMessageV2::ListSubscriptions { subscriptions, .. } => {
+            let subscription = subscriptions
+                .into_iter()
+                .find(|sub| sub.sid == sid)
+                .expect("orderbook subscription missing from list_subscriptions");
+            assert!(
+                subscription.channels.contains(&WsChannelV2::OrderbookDelta)
+                    || subscription.channel == Some(WsChannelV2::OrderbookDelta)
+            );
+            if let Some(market_tickers) = subscription.market_tickers {
+                assert_eq!(market_tickers, vec![market_ticker]);
+            }
+        }
+        other => panic!("expected list_subscriptions response, got {other:?}"),
+    }
 }

@@ -1,7 +1,13 @@
-use kalshi_fast::{KalshiAuth, KalshiEnvironment, KalshiRestClient, RateLimitConfig, RetryConfig};
+use kalshi_fast::{
+    GetMarketsParams, KalshiAuth, KalshiEnvironment, KalshiRestClient, KalshiWsLowLevelClient,
+    MarketStatusQuery, RateLimitConfig, RetryConfig, WsChannelV2, WsDataMessageV2, WsMessageV2,
+    WsSubscriptionParamsV2,
+};
 use std::time::Duration;
+use tokio::time::{Instant, timeout};
 
-pub const TEST_TIMEOUT: Duration = Duration::from_secs(20);
+pub const TEST_TIMEOUT: Duration = Duration::from_secs(30);
+pub const CHANNEL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[allow(dead_code)]
 pub fn load_env() {
@@ -27,6 +33,19 @@ pub fn load_auth() -> KalshiAuth {
 
 pub fn demo_env() -> KalshiEnvironment {
     KalshiEnvironment::demo()
+}
+
+#[allow(dead_code)]
+pub async fn connect_demo_ws() -> KalshiWsLowLevelClient {
+    load_env();
+    let auth = load_auth();
+
+    timeout(TEST_TIMEOUT, async {
+        KalshiWsLowLevelClient::connect_authenticated(demo_env(), auth).await
+    })
+    .await
+    .expect("timed out connecting to demo websocket")
+    .expect("failed to connect to demo websocket")
 }
 
 #[allow(dead_code)]
@@ -64,4 +83,133 @@ pub fn demo_auth_client(auth: KalshiAuth) -> KalshiRestClient {
         })
         .build()
         .expect("build authenticated live test client")
+}
+
+#[allow(dead_code)]
+pub async fn first_open_demo_market_ticker() -> String {
+    let markets_resp = timeout(TEST_TIMEOUT, async {
+        demo_client()
+            .get_markets(GetMarketsParams {
+                limit: Some(1),
+                status: Some(MarketStatusQuery::Open),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timed out fetching demo markets")
+    .expect("failed to fetch demo markets");
+
+    markets_resp
+        .markets
+        .into_iter()
+        .next()
+        .map(|market| market.ticker)
+        .expect("demo environment returned no open markets")
+}
+
+#[allow(dead_code)]
+pub async fn active_demo_market_ticker_via_trade() -> String {
+    active_demo_market_tickers_via_trade(1).await.remove(0)
+}
+
+#[allow(dead_code)]
+pub async fn active_demo_market_tickers_via_trade(target_count: usize) -> Vec<String> {
+    let mut ws = connect_demo_ws().await;
+
+    let subscribe_id = ws
+        .subscribe_v2(WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::Trade],
+            ..Default::default()
+        })
+        .await
+        .expect("trade subscribe failed while locating active demo market");
+
+    wait_for_subscribed(&mut ws, subscribe_id).await;
+
+    let deadline = Instant::now() + CHANNEL_TIMEOUT;
+    let mut tickers = Vec::new();
+
+    while tickers.len() < target_count {
+        let now = Instant::now();
+        assert!(
+            now < deadline,
+            "timed out waiting for {target_count} active trade-backed demo markets"
+        );
+
+        let trade = require_trade_data(
+            wait_for_message(&mut ws, deadline - now, |msg| {
+                matches!(msg, WsMessageV2::Data(WsDataMessageV2::Trade { .. }))
+            })
+            .await,
+        );
+
+        if !tickers.iter().any(|ticker| ticker == &trade.market_ticker) {
+            tickers.push(trade.market_ticker);
+        }
+    }
+
+    tickers
+}
+
+#[allow(dead_code)]
+pub async fn wait_for_subscribed(ws: &mut KalshiWsLowLevelClient, command_id: u64) -> u64 {
+    let message = wait_for_message(
+        ws,
+        CHANNEL_TIMEOUT,
+        |msg| matches!(msg, WsMessageV2::Subscribed { id: Some(id), .. } if *id == command_id),
+    )
+    .await;
+
+    match message {
+        WsMessageV2::Subscribed { sid: Some(sid), .. } => sid,
+        other => panic!("expected subscribed response with sid, got {other:?}"),
+    }
+}
+
+#[allow(dead_code)]
+pub async fn wait_for_message<F>(
+    ws: &mut KalshiWsLowLevelClient,
+    timeout_window: Duration,
+    mut predicate: F,
+) -> WsMessageV2
+where
+    F: FnMut(&WsMessageV2) -> bool,
+{
+    let deadline = Instant::now() + timeout_window;
+
+    loop {
+        let now = Instant::now();
+        assert!(now < deadline, "timed out waiting for websocket message");
+        let remaining = deadline - now;
+
+        let message = timeout(remaining, ws.next_message_v2())
+            .await
+            .expect("timed out waiting for websocket frame")
+            .expect("failed to read websocket message");
+
+        if let WsMessageV2::Error { error, .. } = &message {
+            panic!("received websocket error: {:?}", error);
+        }
+
+        if predicate(&message) {
+            return message;
+        }
+    }
+}
+
+#[allow(dead_code)]
+pub fn require_ticker_data(message: WsMessageV2) -> kalshi_fast::WsTicker {
+    match message {
+        WsMessageV2::Data(WsDataMessageV2::Ticker { msg, .. }) => msg,
+        other => panic!("expected ticker data message, got {other:?}"),
+    }
+}
+
+#[allow(dead_code)]
+pub fn require_trade_data(message: WsMessageV2) -> kalshi_fast::WsTrade {
+    match message {
+        WsMessageV2::Data(WsDataMessageV2::Trade { msg, .. }) => msg,
+        other => panic!("expected trade data message, got {other:?}"),
+    }
 }

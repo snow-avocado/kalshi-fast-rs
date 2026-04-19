@@ -16,6 +16,7 @@ name = "kalshi_fast"
 [features]
 default = []
 live-tests = []
+live-prod-tests = ["live-tests"]
 
 [dependencies]
 # REST

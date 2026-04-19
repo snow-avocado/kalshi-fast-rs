@@ -37,21 +37,36 @@ pub fn demo_env() -> KalshiEnvironment {
 }
 
 #[allow(dead_code)]
-pub async fn connect_demo_ws() -> KalshiWsLowLevelClient {
+pub fn prod_env() -> KalshiEnvironment {
+    KalshiEnvironment::production()
+}
+
+#[allow(dead_code)]
+pub async fn connect_ws(env: KalshiEnvironment) -> KalshiWsLowLevelClient {
     load_env();
     let auth = load_auth();
 
     timeout(TEST_TIMEOUT, async {
-        KalshiWsLowLevelClient::connect_authenticated(demo_env(), auth).await
+        KalshiWsLowLevelClient::connect_authenticated(env, auth).await
     })
     .await
-    .expect("timed out connecting to demo websocket")
-    .expect("failed to connect to demo websocket")
+    .expect("timed out connecting to websocket")
+    .expect("failed to connect to websocket")
 }
 
 #[allow(dead_code)]
-pub fn demo_client() -> KalshiRestClient {
-    KalshiRestClient::builder(demo_env())
+pub async fn connect_demo_ws() -> KalshiWsLowLevelClient {
+    connect_ws(demo_env()).await
+}
+
+#[allow(dead_code)]
+pub async fn connect_prod_ws() -> KalshiWsLowLevelClient {
+    connect_ws(prod_env()).await
+}
+
+#[allow(dead_code)]
+pub fn rest_client(env: KalshiEnvironment) -> KalshiRestClient {
+    KalshiRestClient::builder(env)
         .with_rate_limit_config(RateLimitConfig {
             read_rps: 4,
             write_rps: 2,
@@ -65,6 +80,16 @@ pub fn demo_client() -> KalshiRestClient {
         })
         .build()
         .expect("build live test client")
+}
+
+#[allow(dead_code)]
+pub fn demo_client() -> KalshiRestClient {
+    rest_client(demo_env())
+}
+
+#[allow(dead_code)]
+pub fn prod_client() -> KalshiRestClient {
+    rest_client(prod_env())
 }
 
 #[allow(dead_code)]
@@ -87,26 +112,30 @@ pub fn demo_auth_client(auth: KalshiAuth) -> KalshiRestClient {
 }
 
 #[allow(dead_code)]
-pub async fn first_open_demo_market_ticker() -> String {
-    let markets_resp = timeout(TEST_TIMEOUT, async {
-        demo_client()
-            .get_markets(GetMarketsParams {
-                limit: Some(1),
-                status: Some(MarketStatusQuery::Open),
-                ..Default::default()
-            })
-            .await
-    })
+pub async fn first_open_market_ticker(client: &KalshiRestClient) -> String {
+    let markets_resp = timeout(
+        TEST_TIMEOUT,
+        client.get_markets(GetMarketsParams {
+            limit: Some(1),
+            status: Some(MarketStatusQuery::Open),
+            ..Default::default()
+        }),
+    )
     .await
-    .expect("timed out fetching demo markets")
-    .expect("failed to fetch demo markets");
+    .expect("timed out fetching markets")
+    .expect("failed to fetch markets");
 
     markets_resp
         .markets
         .into_iter()
         .next()
         .map(|market| market.ticker)
-        .expect("demo environment returned no open markets")
+        .expect("environment returned no open markets")
+}
+
+#[allow(dead_code)]
+pub async fn first_open_demo_market_ticker() -> String {
+    first_open_market_ticker(&demo_client()).await
 }
 
 #[allow(dead_code)]

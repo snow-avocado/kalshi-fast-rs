@@ -1,9 +1,10 @@
 use kalshi_fast::{
-    GetMarketsParams, KalshiAuth, KalshiEnvironment, KalshiRestClient, KalshiWsLowLevelClient,
-    MarketStatusQuery, RateLimitConfig, RetryConfig, WsChannelV2, WsDataMessageV2, WsMessageV2,
-    WsSubscriptionParamsV2,
+    EventData, GetEventsParams, GetHistoricalMarketsParams, GetMarketsParams,
+    GetMultivariateEventsParams, GetSeriesListParams, KalshiAuth, KalshiEnvironment,
+    KalshiRestClient, KalshiWsLowLevelClient, Market, MarketStatusQuery, RateLimitConfig,
+    RetryConfig, WsChannelV2, WsDataMessageV2, WsMessageV2, WsSubscriptionParamsV2,
 };
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::{Instant, timeout};
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -196,6 +197,108 @@ where
             return message;
         }
     }
+}
+
+#[allow(dead_code)]
+pub fn now_ts() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock before epoch")
+        .as_secs() as i64
+}
+
+#[allow(dead_code)]
+pub fn now_minus_days(days: u64) -> i64 {
+    now_ts() - (days as i64) * 86_400
+}
+
+#[allow(dead_code)]
+pub async fn pick_active_market(client: &KalshiRestClient) -> Market {
+    let resp = timeout(
+        TEST_TIMEOUT,
+        client.get_markets(GetMarketsParams {
+            limit: Some(10),
+            status: Some(MarketStatusQuery::Open),
+            ..Default::default()
+        }),
+    )
+    .await
+    .expect("timed out fetching active markets")
+    .expect("failed to fetch active markets");
+
+    resp.markets
+        .into_iter()
+        .next()
+        .expect("demo environment returned no open markets")
+}
+
+#[allow(dead_code)]
+pub async fn pick_settled_market(client: &KalshiRestClient) -> Market {
+    let resp = timeout(
+        TEST_TIMEOUT,
+        client.get_historical_markets(GetHistoricalMarketsParams {
+            limit: Some(5),
+            ..Default::default()
+        }),
+    )
+    .await
+    .expect("timed out fetching historical markets")
+    .expect("failed to fetch historical markets");
+
+    resp.markets
+        .into_iter()
+        .next()
+        .expect("demo environment returned no historical markets")
+}
+
+#[allow(dead_code)]
+pub async fn pick_event_with_series(client: &KalshiRestClient) -> (String, String) {
+    let series_resp = timeout(
+        TEST_TIMEOUT,
+        client.get_series_list(GetSeriesListParams::default()),
+    )
+    .await
+    .expect("timed out fetching series list")
+    .expect("failed to fetch series list");
+
+    for series in series_resp.series {
+        let events = timeout(
+            TEST_TIMEOUT,
+            client.get_events(GetEventsParams {
+                limit: Some(1),
+                series_ticker: Some(series.ticker.clone()),
+                ..Default::default()
+            }),
+        )
+        .await
+        .expect("timed out fetching events for series")
+        .expect("failed to fetch events for series");
+
+        if let Some(event) = events.events.into_iter().next() {
+            return (series.ticker, event.event_ticker);
+        }
+    }
+
+    panic!("demo environment had no series with events");
+}
+
+#[allow(dead_code)]
+pub async fn pick_multivariate_event(client: &KalshiRestClient) -> EventData {
+    let resp = timeout(
+        TEST_TIMEOUT,
+        client.get_multivariate_events(GetMultivariateEventsParams {
+            limit: Some(5),
+            ..Default::default()
+        }),
+    )
+    .await
+    .expect("timed out fetching multivariate events")
+    .expect("failed to fetch multivariate events");
+
+    resp.events
+        .into_iter()
+        .next()
+        .expect("demo environment returned no multivariate events")
 }
 
 #[allow(dead_code)]

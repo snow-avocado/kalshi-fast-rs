@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kalshi API Docs"
+  short_description: "Lean Kalshi API reference skill"
+  default_prompt: "Use $kalshi-api-docs to check current Kalshi docs, terminology, and request helpers before implementing API interactions."

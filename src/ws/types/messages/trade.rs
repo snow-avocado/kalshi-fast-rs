@@ -13,7 +13,10 @@ pub struct WsTrade {
     pub no_price_dollars: String,
     pub taker_side: TradeTakerSide,
     pub ts: i64,
-    pub ts_ms: i64,
+    /// Spec marks `ts_ms` as required, but the exchange occasionally omits it.
+    /// See `docs/spec-parity.md`.
+    #[serde(default)]
+    pub ts_ms: Option<i64>,
     #[serde(default)]
     pub created_time: Option<String>,
 }
@@ -33,7 +36,10 @@ pub struct WsTradeRef<'a> {
     pub no_price_dollars: Cow<'a, str>,
     pub taker_side: TradeTakerSide,
     pub ts: i64,
-    pub ts_ms: i64,
+    /// Spec marks `ts_ms` as required, but the exchange occasionally omits it.
+    /// See `docs/spec-parity.md`.
+    #[serde(default)]
+    pub ts_ms: Option<i64>,
     #[serde(default, borrow)]
     pub created_time: Option<Cow<'a, str>>,
 }

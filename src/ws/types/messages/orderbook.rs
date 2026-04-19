@@ -27,6 +27,7 @@ pub struct WsOrderbookDelta {
     pub client_order_id: Option<String>,
     #[serde(default)]
     pub subaccount: Option<i64>,
+    #[deprecated(note = "spec marks this as deprecated, yet optional. use ts_ms instead")]
     #[serde(default)]
     pub ts: Option<String>,
     #[serde(default)]
@@ -120,5 +121,48 @@ mod tests {
         }"#;
         let delta: WsOrderbookDelta = serde_json::from_str(json).unwrap();
         assert!(matches!(delta.side, YesNo::Yes));
+    }
+
+    #[test]
+    fn ws_orderbook_delta_timestamps_are_optional() {
+        let json_missing_both = r#"{
+            "market_ticker":"TEST",
+            "market_id":"1",
+            "price_dollars":"0.01",
+            "delta_fp":"1",
+            "side":"yes"
+        }"#;
+        let delta_missing_both: WsOrderbookDelta = serde_json::from_str(json_missing_both).unwrap();
+        assert_eq!(delta_missing_both.ts, None);
+        assert_eq!(delta_missing_both.ts_ms, None);
+
+        let json_missing_ts_only = r#"{
+            "market_ticker":"TEST",
+            "market_id":"1",
+            "price_dollars":"0.01",
+            "delta_fp":"1",
+            "side":"yes",
+            "ts_ms": 1669149841000
+        }"#;
+        let delta_missing_ts: WsOrderbookDelta =
+            serde_json::from_str(json_missing_ts_only).unwrap();
+        assert_eq!(delta_missing_ts.ts, None);
+        assert_eq!(delta_missing_ts.ts_ms, Some(1669149841000));
+
+        let json_missing_ts_ms_only = r#"{
+            "market_ticker":"TEST",
+            "market_id":"1",
+            "price_dollars":"0.01",
+            "delta_fp":"1",
+            "side":"yes",
+            "ts":"2022-11-22T20:44:01Z"
+        }"#;
+        let delta_missing_ts_ms: WsOrderbookDelta =
+            serde_json::from_str(json_missing_ts_ms_only).unwrap();
+        assert_eq!(
+            delta_missing_ts_ms.ts.as_deref(),
+            Some("2022-11-22T20:44:01Z")
+        );
+        assert_eq!(delta_missing_ts_ms.ts_ms, None);
     }
 }

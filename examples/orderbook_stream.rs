@@ -9,16 +9,16 @@
 use kalshi_fast::{
     GetMarketsParams, KalshiAuth, KalshiEnvironment, KalshiRestClient, KalshiWsClient, Market,
     MarketStatusQuery, MveFilter, WsDataMessageV2, WsEvent, WsMessageV2, WsReconnectConfig,
-    WsSubscriptionParamsV2,
+    WsSubscriptionParamsV2, parse_f64_opt,
 };
 use std::time::Duration;
 use tokio::time::sleep;
 
-const MIN_VOLUME_24H: i64 = 10_000;
+const MIN_VOLUME_24H: f64 = 1_000.0;
 const MAX_PAGES: usize = 50;
 
-fn get_volume(market: &Market) -> i64 {
-    market.volume_24h.unwrap_or(0)
+fn get_volume_24h(market: &Market) -> f64 {
+    parse_f64_opt(market.volume_24h_fp.as_deref()).expect("market volume_24h_fp missing")
 }
 
 #[tokio::main]
@@ -33,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut cursor: Option<String> = None;
     let mut target_market: Option<Market> = None;
+    let mut best_market: Option<(f64, Market)> = None;
 
     for _page in 1..=MAX_PAGES {
         let resp = client
@@ -47,12 +48,21 @@ async fn main() -> anyhow::Result<()> {
 
         print!(".");
 
-        if let Some(m) = resp
-            .markets
-            .into_iter()
-            .find(|m| get_volume(m) > MIN_VOLUME_24H)
-        {
-            target_market = Some(m);
+        for market in resp.markets {
+            let volume_24h = get_volume_24h(&market);
+            if best_market
+                .as_ref()
+                .is_none_or(|(best_volume, _)| volume_24h > *best_volume)
+            {
+                best_market = Some((volume_24h, market.clone()));
+            }
+            if volume_24h > MIN_VOLUME_24H {
+                target_market = Some(market);
+                break;
+            }
+        }
+
+        if target_market.is_some() {
             break;
         }
 
@@ -69,9 +79,17 @@ async fn main() -> anyhow::Result<()> {
 
     let target_market = match target_market {
         Some(m) => m,
-        None => {
-            anyhow::bail!("No market found with 24h volume > {MIN_VOLUME_24H}");
-        }
+        None => match best_market {
+            Some((best_volume, market)) => {
+                eprintln!(
+                    "No market found with 24h volume > {MIN_VOLUME_24H}; falling back to highest scanned 24h volume {best_volume:.2}"
+                );
+                market
+            }
+            None => {
+                anyhow::bail!("No open, non-MVE market found while scanning production markets");
+            }
+        },
     };
 
     let event_ticker = target_market
@@ -80,9 +98,9 @@ async fn main() -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Market missing event_ticker"))?;
 
     println!(
-        "Found event: {} (volume: {})",
+        "Found event: {} (24h volume: {:.2})",
         event_ticker,
-        get_volume(&target_market)
+        get_volume_24h(&target_market)
     );
 
     // Step 2: Fetch all markets for this event
@@ -133,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
             WsEvent::Message(msg) => match msg {
                 WsMessageV2::Data(WsDataMessageV2::OrderbookSnapshot { msg, seq, .. }) => {
                     println!(
-                        "[SNAPSHOT] {} | yes_fp={} no_fp={} | seq={:?}",
+                        "[SNAPSHOT] {} | yes_depth={} no_depth={} | seq={:?}",
                         msg.market_ticker,
                         msg.yes_dollars_fp.len(),
                         msg.no_dollars_fp.len(),
@@ -160,4 +178,33 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn market_from_value(value: serde_json::Value) -> Market {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn parse_f64_accepts_decimal_strings() {
+        assert_eq!(parse_f64(Some("123.45")), 123.45);
+        assert_eq!(parse_f64(Some("0.00")), 0.0);
+        assert_eq!(parse_f64(None), 0.0);
+        assert_eq!(parse_f64(Some("not-a-number")), 0.0);
+    }
+
+    #[test]
+    fn get_volume_24h_uses_volume_24h_fp_not_lifetime_volume() {
+        let market = market_from_value(json!({
+            "ticker": "MKT-1",
+            "volume_fp": "9999.00",
+            "volume_24h_fp": "12.50"
+        }));
+
+        assert_eq!(get_volume_24h(&market), 12.5);
+    }
 }

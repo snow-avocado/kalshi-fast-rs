@@ -158,11 +158,12 @@ impl WsUpdateSubscriptionParamsV2 {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WsUpdateAction {
     AddMarkets,
     DeleteMarkets,
+    GetSnapshot,
 }
 
 pub(crate) fn validate_update(params: &WsUpdateSubscriptionParamsV2) -> Result<(), KalshiError> {
@@ -180,6 +181,55 @@ pub(crate) fn validate_update(params: &WsUpdateSubscriptionParamsV2) -> Result<(
             "update_subscription: sids must contain exactly one sid".to_string(),
         ));
     }
+
+    let has_market_ticker = params.market_ticker.is_some();
+    let has_market_tickers = params
+        .market_tickers
+        .as_ref()
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    let has_market_id = params.market_id.is_some();
+    let has_market_ids = params
+        .market_ids
+        .as_ref()
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    let has_any_market_tickers = has_market_ticker || has_market_tickers;
+    let has_any_market_ids = has_market_id || has_market_ids;
+
+    if has_market_ticker && has_market_tickers {
+        return Err(KalshiError::InvalidParams(
+            "update_subscription: provide at most one of market_ticker or market_tickers"
+                .to_string(),
+        ));
+    }
+    if has_market_id && has_market_ids {
+        return Err(KalshiError::InvalidParams(
+            "update_subscription: provide at most one of market_id or market_ids".to_string(),
+        ));
+    }
+    if has_any_market_tickers && has_any_market_ids {
+        return Err(KalshiError::InvalidParams(
+            "update_subscription: market_ticker(s) and market_id(s) are mutually exclusive"
+                .to_string(),
+        ));
+    }
+
+    if params.action == WsUpdateAction::GetSnapshot {
+        if !has_any_market_tickers {
+            return Err(KalshiError::InvalidParams(
+                "update_subscription: get_snapshot requires market_ticker or market_tickers"
+                    .to_string(),
+            ));
+        }
+        if has_any_market_ids {
+            return Err(KalshiError::InvalidParams(
+                "update_subscription: get_snapshot does not support market_id or market_ids"
+                    .to_string(),
+            ));
+        }
+    }
+
     Ok(())
 }
 
@@ -392,6 +442,54 @@ mod tests {
             skip_ticker_ack: None,
         };
         assert!(validate_update(&valid).is_ok());
+    }
+
+    #[test]
+    fn validate_update_get_snapshot_requires_market_target() {
+        let params = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::GetSnapshot,
+            sid: Some(1),
+            sids: None,
+            market_ticker: None,
+            market_tickers: None,
+            market_id: None,
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+        };
+        assert!(validate_update(&params).is_err());
+    }
+
+    #[test]
+    fn validate_update_get_snapshot_rejects_market_ids() {
+        let params = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::GetSnapshot,
+            sid: Some(1),
+            sids: None,
+            market_ticker: Some("TICKER".to_string()),
+            market_tickers: None,
+            market_id: Some("uuid".to_string()),
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+        };
+        assert!(validate_update(&params).is_err());
+    }
+
+    #[test]
+    fn validate_update_get_snapshot_accepts_market_tickers() {
+        let params = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::GetSnapshot,
+            sid: Some(1),
+            sids: None,
+            market_ticker: None,
+            market_tickers: Some(vec!["TICKER".to_string()]),
+            market_id: None,
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+        };
+        assert!(validate_update(&params).is_ok());
     }
 
     #[test]

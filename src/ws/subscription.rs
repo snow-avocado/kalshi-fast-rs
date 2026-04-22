@@ -90,6 +90,7 @@ impl SubscriptionTracker {
                             *target = None;
                         }
                     }
+                    WsUpdateAction::GetSnapshot => {}
                 }
             };
 
@@ -195,5 +196,32 @@ mod tests {
         );
         assert_eq!(updated.send_initial_snapshot, Some(true));
         assert_eq!(updated.skip_ticker_ack, Some(true));
+    }
+
+    #[test]
+    fn subscription_tracker_get_snapshot_does_not_mutate_targets() {
+        let mut tracker = SubscriptionTracker::default();
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
+            market_tickers: Some(vec!["A".to_string()]),
+            ..Default::default()
+        };
+        tracker.active.insert(10, params.clone());
+
+        let update = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::GetSnapshot,
+            sid: Some(10),
+            sids: None,
+            market_ticker: Some("B".to_string()),
+            market_tickers: None,
+            market_id: None,
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+        };
+        tracker.apply_update(&update);
+
+        let updated = tracker.active.get(&10).unwrap();
+        assert_eq!(updated.market_tickers, params.market_tickers);
     }
 }

@@ -1,0 +1,201 @@
+//! Exchange status, announcements, and schedule.
+//!
+//! Public endpoints exposing operational state of the Kalshi exchange: whether
+//! trading is active, current announcements, standard and maintenance hours,
+//! and timestamps/fee changes useful for cache invalidation.
+
+use crate::KalshiError;
+use crate::rest::client::KalshiRestClient;
+use crate::types::{FeeType, deserialize_null_as_empty_vec};
+use reqwest::Method;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetExchangeStatusResponse {
+    pub exchange_active: bool,
+    pub trading_active: bool,
+    #[serde(default)]
+    pub exchange_estimated_resume_time: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnnouncementType {
+    Info,
+    Warning,
+    Error,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnnouncementStatus {
+    Active,
+    Inactive,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Announcement {
+    #[serde(rename = "type")]
+    pub r#type: AnnouncementType,
+    pub message: String,
+    pub delivery_time: String,
+    pub status: AnnouncementStatus,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetExchangeAnnouncementsResponse {
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    pub announcements: Vec<Announcement>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DailySchedule {
+    pub open_time: String,
+    pub close_time: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct StandardHours {
+    pub start_time: String,
+    pub end_time: String,
+    #[serde(default)]
+    pub monday: Vec<DailySchedule>,
+    #[serde(default)]
+    pub tuesday: Vec<DailySchedule>,
+    #[serde(default)]
+    pub wednesday: Vec<DailySchedule>,
+    #[serde(default)]
+    pub thursday: Vec<DailySchedule>,
+    #[serde(default)]
+    pub friday: Vec<DailySchedule>,
+    #[serde(default)]
+    pub saturday: Vec<DailySchedule>,
+    #[serde(default)]
+    pub sunday: Vec<DailySchedule>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MaintenanceWindow {
+    pub start_datetime: String,
+    pub end_datetime: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ExchangeSchedule {
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    pub standard_hours: Vec<StandardHours>,
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    pub maintenance_windows: Vec<MaintenanceWindow>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetExchangeScheduleResponse {
+    pub schedule: ExchangeSchedule,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetUserDataTimestampResponse {
+    pub as_of_time: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SeriesFeeChange {
+    pub id: i64,
+    pub series_ticker: String,
+    pub fee_type: FeeType,
+    pub fee_multiplier: i64,
+    pub scheduled_ts: i64,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct GetSeriesFeeChangesParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub series_ticker: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub show_historical: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GetSeriesFeeChangesResponse {
+    #[serde(rename = "series_fee_change_arr")]
+    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
+    pub series_fee_change_arr: Vec<SeriesFeeChange>,
+}
+
+impl KalshiRestClient {
+    /// Get the current exchange status (open, closed, etc.).
+    pub async fn get_exchange_status(&self) -> Result<GetExchangeStatusResponse, KalshiError> {
+        let path = Self::full_path("/exchange/status");
+        self.send(
+            Method::GET,
+            &path,
+            Option::<&()>::None,
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
+    /// Get exchange announcements.
+    pub async fn get_exchange_announcements(
+        &self,
+    ) -> Result<GetExchangeAnnouncementsResponse, KalshiError> {
+        let path = Self::full_path("/exchange/announcements");
+        self.send(
+            Method::GET,
+            &path,
+            Option::<&()>::None,
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
+    /// Get the exchange trading schedule.
+    pub async fn get_exchange_schedule(&self) -> Result<GetExchangeScheduleResponse, KalshiError> {
+        let path = Self::full_path("/exchange/schedule");
+        self.send(
+            Method::GET,
+            &path,
+            Option::<&()>::None,
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
+    /// Get the timestamp of the latest user-data change (useful for cache invalidation).
+    pub async fn get_user_data_timestamp(
+        &self,
+    ) -> Result<GetUserDataTimestampResponse, KalshiError> {
+        let path = Self::full_path("/exchange/user_data_timestamp");
+        self.send(
+            Method::GET,
+            &path,
+            Option::<&()>::None,
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
+    /// List fee changes for a series.
+    pub async fn get_series_fee_changes(
+        &self,
+        params: GetSeriesFeeChangesParams,
+    ) -> Result<GetSeriesFeeChangesResponse, KalshiError> {
+        let path = Self::full_path("/series/fee_changes");
+        self.send(
+            Method::GET,
+            &path,
+            Some(&params),
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+}

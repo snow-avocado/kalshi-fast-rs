@@ -11,40 +11,46 @@
 //!
 //! | Channel | Auth | Description |
 //! |---------|------|-------------|
-//! | [`WsChannel::Ticker`] | No | Price / volume snapshots |
-//! | [`WsChannel::Trade`] | No | Public trades |
-//! | [`WsChannel::MarketLifecycleV2`] | No | Market open / close / settle events |
-//! | [`WsChannel::Multivariate`] | No | Multivariate market lookups |
-//! | [`WsChannel::OrderbookDelta`] | Yes | L2 order-book deltas (requires `market_tickers`) |
-//! | [`WsChannel::Fill`] | Yes | Your fills |
-//! | [`WsChannel::MarketPositions`] | Yes | Position changes |
-//! | [`WsChannel::Communications`] | Yes | RFQs and quotes |
-//! | [`WsChannel::OrderGroupUpdates`] | Yes | Order-group lifecycle |
-//! | [`WsChannel::UserOrders`] | Yes | User order lifecycle updates |
+//! | [`WsChannelV2::Ticker`] | No | Price / volume snapshots |
+//! | [`WsChannelV2::Trade`] | No | Public trades |
+//! | [`WsChannelV2::MarketLifecycleV2`] | No | Market open / close / settle events |
+//! | [`WsChannelV2::MultivariateMarketLifecycle`] | No | Multivariate market lifecycle events |
+//! | [`WsChannelV2::Multivariate`] | No | Multivariate market lookups |
+//! | [`WsChannelV2::OrderbookDelta`] | Yes | L2 order-book deltas (requires `market_tickers`) |
+//! | [`WsChannelV2::Fill`] | Yes | Your fills |
+//! | [`WsChannelV2::MarketPositions`] | Yes | Position changes |
+//! | [`WsChannelV2::Communications`] | Yes | RFQs and quotes |
+//! | [`WsChannelV2::OrderGroupUpdates`] | Yes | Order-group lifecycle |
+//! | [`WsChannelV2::UserOrders`] | Yes | User order lifecycle updates |
 //!
 //! # Quick Start — Public Ticker
 //!
 //! ```no_run
 //! use kalshi_fast::{
-//!     KalshiEnvironment, KalshiWsClient, WsChannel, WsDataMessage,
-//!     WsEvent, WsMessage, WsReconnectConfig, WsSubscriptionParams,
+//!     KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2, WsDataMessageV2,
+//!     WsEvent, WsMessageV2, WsReconnectConfig, WsSubscriptionParamsV2,
 //! };
 //!
 //! # async fn run() -> Result<(), kalshi_fast::KalshiError> {
-//! let mut ws = KalshiWsClient::connect(
+//! let auth = KalshiAuth::from_pem_file(
+//!     std::env::var("KALSHI_KEY_ID").unwrap(),
+//!     std::env::var("KALSHI_PRIVATE_KEY_PATH").unwrap(),
+//! )?;
+//! let mut ws = KalshiWsClient::connect_authenticated(
 //!     KalshiEnvironment::demo(),
+//!     auth,
 //!     WsReconnectConfig::default(),
 //! ).await?;
 //!
-//! ws.subscribe(WsSubscriptionParams {
-//!     channels: vec![WsChannel::Ticker],
+//! ws.subscribe_v2(WsSubscriptionParamsV2 {
+//!     channels: vec![WsChannelV2::Ticker],
 //!     ..Default::default()
 //! }).await?;
 //!
 //! loop {
-//!     match ws.next_event().await? {
-//!         WsEvent::Message(WsMessage::Data(WsDataMessage::Ticker { msg, .. })) => {
-//!             println!("{}: {}", msg.market_ticker, msg.price);
+//!     match ws.next_event_v2().await? {
+//!         WsEvent::Message(WsMessageV2::Data(WsDataMessageV2::Ticker { msg, .. })) => {
+//!             println!("{}: {}", msg.market_ticker, msg.price_dollars);
 //!         }
 //!         WsEvent::Reconnected { attempt } => println!("Reconnected (attempt {attempt})"),
 //!         WsEvent::Disconnected { .. } => break,
@@ -57,12 +63,13 @@
 //!
 //! # Authenticated — Order-Book Deltas
 //!
-//! Private channels require [`KalshiWsClient::connect_authenticated`]:
+//! Kalshi requires [`KalshiWsClient::connect_authenticated`] for every WebSocket
+//! connection, including public channels:
 //!
 //! ```no_run
 //! use kalshi_fast::{
-//!     KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannel,
-//!     WsDataMessage, WsEvent, WsMessage, WsReconnectConfig, WsSubscriptionParams,
+//!     KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2,
+//!     WsDataMessageV2, WsEvent, WsMessageV2, WsReconnectConfig, WsSubscriptionParamsV2,
 //! };
 //!
 //! # async fn run() -> Result<(), kalshi_fast::KalshiError> {
@@ -77,16 +84,16 @@
 //!     WsReconnectConfig::default(),
 //! ).await?;
 //!
-//! ws.subscribe(WsSubscriptionParams {
-//!     channels: vec![WsChannel::OrderbookDelta],
+//! ws.subscribe_v2(WsSubscriptionParamsV2 {
+//!     channels: vec![WsChannelV2::OrderbookDelta],
 //!     market_tickers: Some(vec!["SOME-MARKET".into()]),
 //!     ..Default::default()
 //! }).await?;
 //!
 //! loop {
-//!     match ws.next_event().await? {
-//!         WsEvent::Message(WsMessage::Data(WsDataMessage::OrderbookDelta { msg, .. })) => {
-//!             println!("{} {} delta={}", msg.market_ticker, msg.side, msg.delta);
+//!     match ws.next_event_v2().await? {
+//!         WsEvent::Message(WsMessageV2::Data(WsDataMessageV2::OrderbookDelta { msg, .. })) => {
+//!             println!("{} {} delta={}", msg.market_ticker, msg.side, msg.delta_fp);
 //!         }
 //!         WsEvent::Disconnected { .. } => break,
 //!         _ => {}
@@ -99,10 +106,10 @@
 //! # Message Flow
 //!
 //! ```text
-//! next_event() → WsEvent
-//!                 ├─ Message(WsMessage)
-//!                 │    ├─ Data(WsDataMessage::Ticker { .. })
-//!                 │    ├─ Data(WsDataMessage::Fill { .. })
+//! next_event_v2() → WsEvent
+//!                 ├─ Message(WsMessageV2)
+//!                 │    ├─ Data(WsDataMessageV2::Ticker { .. })
+//!                 │    ├─ Data(WsDataMessageV2::Fill { .. })
 //!                 │    ├─ Subscribed / Unsubscribed / Ok
 //!                 │    ├─ Error { .. }
 //!                 │    └─ Unknown { .. }
@@ -118,7 +125,7 @@
 //! emits [`WsEvent::Disconnected`]. Configure via [`WsReconnectConfig`].
 //!
 //! **Note:** Sequence resync is not automatic; callers must handle any gaps
-//! using the `seq` field on [`WsDataMessage`] variants.
+//! using the `seq` field on [`WsDataMessageV2`] variants.
 
 mod client;
 pub mod types;

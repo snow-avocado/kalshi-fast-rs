@@ -430,6 +430,7 @@ fn historical_params_serialize_correctly() {
         limit: Some(100),
         cursor: Some("c2".into()),
         tickers: Some("MKT-1,MKT-2".into()),
+        series_ticker: None,
         event_ticker: Some("EVT-1".into()),
         mve_filter: Some(MveFilter::Exclude),
     };
@@ -889,12 +890,6 @@ fn cancel_order_response_deserializes() {
 #[test]
 fn get_market_orderbook_response_deserializes() {
     let json = r#"{
-        "orderbook": {
-            "yes": [[50, 100]],
-            "no": [[49, 200]],
-            "yes_dollars": [["0.50", 100]],
-            "no_dollars": [["0.49", 200]]
-        },
         "orderbook_fp": {
             "yes_dollars": [["0.50", "100.00"]],
             "no_dollars": [["0.49", "200.00"]]
@@ -902,22 +897,7 @@ fn get_market_orderbook_response_deserializes() {
     }"#;
 
     let resp: GetMarketOrderbookResponse = serde_json::from_str(json).unwrap();
-    assert_eq!(resp.orderbook.unwrap().yes.len(), 1);
-    assert!(resp.orderbook_fp.is_some());
-}
-
-#[test]
-fn get_market_orderbook_response_deserializes_fp_only_shape() {
-    let json = r#"{
-        "orderbook_fp": {
-            "yes_dollars": [["0.50", "100.00"]],
-            "no_dollars": [["0.49", "200.00"]]
-        }
-    }"#;
-
-    let resp: GetMarketOrderbookResponse = serde_json::from_str(json).unwrap();
-    assert!(resp.orderbook.is_none());
-    assert!(resp.orderbook_fp.is_some());
+    assert_eq!(resp.orderbook_fp.yes_dollars.len(), 1);
 }
 
 #[test]
@@ -1690,6 +1670,95 @@ fn batch_order_responses_deserialize_typed() {
         serde_json::from_str(cancel_json).unwrap();
     assert_eq!(canceled.orders.len(), 1);
     assert_eq!(canceled.orders[0].reduced_by_fp, "1.00");
+}
+
+#[test]
+fn fills_deserialize_current_and_legacy_price_fields() {
+    let current_json = r#"{
+        "fills": [{
+            "fill_id": "f-1",
+            "order_id": "o-1",
+            "trade_id": "t-1",
+            "ticker": "MKT-1",
+            "count_fp": "1.00",
+            "yes_price_dollars": "0.5500",
+            "no_price_dollars": "0.4500"
+        }]
+    }"#;
+    let current: kalshi_fast::GetFillsResponse = serde_json::from_str(current_json).unwrap();
+    assert_eq!(
+        current.fills[0].yes_price_dollars.as_deref(),
+        Some("0.5500")
+    );
+    assert_eq!(current.fills[0].no_price_dollars.as_deref(), Some("0.4500"));
+
+    let legacy_json = r#"{
+        "fills": [{
+            "fill_id": "f-2",
+            "order_id": "o-2",
+            "trade_id": "t-2",
+            "ticker": "MKT-2",
+            "count_fp": "2.00",
+            "yes_price_fixed": "0.6000",
+            "no_price_fixed": "0.4000"
+        }]
+    }"#;
+    let legacy: kalshi_fast::GetFillsResponse = serde_json::from_str(legacy_json).unwrap();
+    assert_eq!(legacy.fills[0].yes_price_dollars.as_deref(), Some("0.6000"));
+    assert_eq!(legacy.fills[0].no_price_dollars.as_deref(), Some("0.4000"));
+}
+
+#[test]
+fn settlements_deserialize_current_and_legacy_cost_fields() {
+    let current_json = r#"{
+        "settlements": [{
+            "settlement_id": "s-1",
+            "ticker": "MKT-1",
+            "yes_count_fp": "1.00",
+            "yes_total_cost_dollars": "0.5500",
+            "no_count_fp": "0.00",
+            "no_total_cost_dollars": "0.0000",
+            "revenue": "1.0000",
+            "settled_time": "2026-04-02T00:00:00Z",
+            "fee_cost": "0.0100",
+            "value": "0.9900",
+            "created_time": "2026-04-02T00:00:00Z"
+        }]
+    }"#;
+    let current: kalshi_fast::GetSettlementsResponse = serde_json::from_str(current_json).unwrap();
+    assert_eq!(
+        current.settlements[0].yes_total_cost_dollars.as_deref(),
+        Some("0.5500")
+    );
+    assert_eq!(
+        current.settlements[0].no_total_cost_dollars.as_deref(),
+        Some("0.0000")
+    );
+
+    let legacy_json = r#"{
+        "settlements": [{
+            "settlement_id": "s-2",
+            "ticker": "MKT-2",
+            "yes_count_fp": "1.00",
+            "yes_total_cost": "0.6500",
+            "no_count_fp": "0.00",
+            "no_total_cost": "0.0000",
+            "revenue": "1.0000",
+            "settled_time": "2026-04-02T00:00:00Z",
+            "fee_cost": "0.0100",
+            "value": "0.9900",
+            "created_time": "2026-04-02T00:00:00Z"
+        }]
+    }"#;
+    let legacy: kalshi_fast::GetSettlementsResponse = serde_json::from_str(legacy_json).unwrap();
+    assert_eq!(
+        legacy.settlements[0].yes_total_cost_dollars.as_deref(),
+        Some("0.6500")
+    );
+    assert_eq!(
+        legacy.settlements[0].no_total_cost_dollars.as_deref(),
+        Some("0.0000")
+    );
 }
 
 #[test]

@@ -2,8 +2,8 @@
 ///
 /// This channel is explicitly called out in the docs as being authenticated
 use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannel, WsEvent, WsReconnectConfig,
-    WsSubscriptionParams,
+    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2, WsEvent, WsReconnectConfig,
+    WsSubscriptionParamsV2,
 };
 
 #[tokio::main]
@@ -18,15 +18,15 @@ async fn main() -> anyhow::Result<()> {
     let mut ws =
         KalshiWsClient::connect_authenticated(env, auth, WsReconnectConfig::default()).await?;
 
-    ws.subscribe(WsSubscriptionParams {
-        channels: vec![WsChannel::OrderbookDelta],
+    ws.subscribe_v2(WsSubscriptionParamsV2 {
+        channels: vec![WsChannelV2::OrderbookDelta],
         market_tickers: Some(vec!["SOME_MARKET_TICKER".to_string()]),
         ..Default::default()
     })
     .await?;
 
     loop {
-        match ws.next_event().await? {
+        match ws.next_event_v2().await? {
             WsEvent::Message(msg) => println!("{:?}", msg),
             WsEvent::Raw(_) => {}
             WsEvent::Reconnected { attempt } => println!("Reconnected (attempt {})", attempt),

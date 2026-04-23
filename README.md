@@ -8,8 +8,8 @@ High-performance async Rust client for the [Kalshi](https://kalshi.com) Trade AP
 
 ## Highlights
 
-- REST parity with Kalshi Trade API `3.8.0` OpenAPI snapshot (`77/77` path+method operations)
-- WebSocket parity with current AsyncAPI snapshot, including `user_orders`
+- REST parity with the current Kalshi Trade API OpenAPI surface
+- WebSocket parity with the current AsyncAPI surface, including `user_orders`
 - Deterministic REST resilience: retries, exponential backoff+jitter, `429 Retry-After` support
 - Builder-based transport controls: timeout, connect timeout, headers, user-agent, proxy, custom `reqwest::Client`
 - Explicit WebSocket lifecycle controls: `close()` + configurable `shutdown_timeout(...)`
@@ -100,12 +100,9 @@ async fn main() -> anyhow::Result<()> {
 - `examples/list_open_markets.rs`
 - `examples/orderbook_stream.rs`
 
-## Spec Parity Artifacts
+## Spec Notes
 
-- OpenAPI snapshot: `docs/specs/kalshi/openapi.yaml`
-- AsyncAPI snapshot: `docs/specs/kalshi/asyncapi.yaml`
-- Parity report: `docs/spec-parity.md`
-- Regeneration script: `scripts/generate_spec_parity.py`
+- Notes on spec-to-crate distinctions: `docs/spec-parity.md`
 
 ## Environment Variables
 

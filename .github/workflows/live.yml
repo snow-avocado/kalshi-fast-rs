@@ -47,7 +47,7 @@ jobs:
             done
           }
 
-          retry 3 cargo test --features live-tests --test rest_public --verbose
-          retry 3 cargo test --features live-tests --test rest_auth --verbose
-          retry 3 cargo test --features live-tests --test ws_public --verbose
-          retry 3 cargo test --features live-tests --test ws_auth --verbose
+          retry 3 cargo test --features live-tests --test rest_public --verbose -- --test-threads=1
+          retry 3 cargo test --features live-tests --test rest_auth --verbose -- --test-threads=1
+          retry 3 cargo test --features live-tests --test ws_public --verbose -- --test-threads=1
+          retry 3 cargo test --features live-tests --test ws_auth --verbose -- --test-threads=1

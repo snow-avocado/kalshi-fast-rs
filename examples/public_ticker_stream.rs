@@ -1,6 +1,6 @@
 use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannel, WsDataMessage, WsEvent, WsMessage,
-    WsReaderConfig, WsReconnectConfig, WsSubscriptionParams,
+    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2, WsDataMessageV2, WsEvent,
+    WsMessageV2, WsReaderConfig, WsReconnectConfig, WsSubscriptionParamsV2,
 };
 
 #[tokio::main]
@@ -16,21 +16,21 @@ async fn main() -> anyhow::Result<()> {
     let mut ws =
         KalshiWsClient::connect_authenticated(env, auth, WsReconnectConfig::default()).await?;
 
-    ws.subscribe(WsSubscriptionParams {
-        channels: vec![WsChannel::Ticker],
+    ws.subscribe_v2(WsSubscriptionParamsV2 {
+        channels: vec![WsChannelV2::Ticker],
         ..Default::default()
     })
     .await?;
 
-    let events = ws.start_reader(WsReaderConfig::default()).await?;
+    let events = ws.start_reader_v2(WsReaderConfig::default()).await?;
 
     while let Some(event) = events.next().await {
         match event {
             WsEvent::Message(msg) => match msg {
-                WsMessage::Data(WsDataMessage::Ticker { msg, .. }) => {
+                WsMessageV2::Data(WsDataMessageV2::Ticker { msg, .. }) => {
                     println!(
                         "type=ticker market={} price={}",
-                        msg.market_ticker, msg.price
+                        msg.market_ticker, msg.price_dollars
                     );
                 }
                 other => {

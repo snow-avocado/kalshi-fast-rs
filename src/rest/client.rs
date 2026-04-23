@@ -912,6 +912,16 @@ impl KalshiRestClient {
         .await
     }
 
+    /// Get order books for multiple markets in one request.
+    pub async fn get_market_orderbooks(
+        &self,
+        params: GetMarketOrderbooksParams,
+    ) -> Result<GetMarketOrderbooksResponse, KalshiError> {
+        let path = Self::full_path("/markets/orderbooks");
+        self.send(Method::GET, &path, Some(&params), Option::<&()>::None, true)
+            .await
+    }
+
     // -----------------------------------------------
     // Trades
     // -----------------------------------------------
@@ -940,6 +950,14 @@ impl KalshiRestClient {
         let path = Self::full_path("/historical/fills");
         self.send(Method::GET, &path, Some(&params), Option::<&()>::None, true)
             .await
+    }
+
+    /// List historical fills. Requires auth.
+    pub async fn get_fills_historical(
+        &self,
+        params: GetHistoricalFillsParams,
+    ) -> Result<GetFillsResponse, KalshiError> {
+        self.get_historical_fills(params).await
     }
 
     /// List historical orders. Requires auth.
@@ -975,6 +993,22 @@ impl KalshiRestClient {
             Method::GET,
             &path,
             Option::<&()>::None,
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
+    /// List historical trades.
+    pub async fn get_trades_historical(
+        &self,
+        params: GetTradesParams,
+    ) -> Result<GetTradesResponse, KalshiError> {
+        let path = Self::full_path("/historical/trades");
+        self.send(
+            Method::GET,
+            &path,
+            Some(&params),
             Option::<&()>::None,
             false,
         )
@@ -1509,6 +1543,37 @@ impl KalshiRestClient {
         .await
     }
 
+    pub async fn get_live_data_by_milestone(
+        &self,
+        milestone_id: &str,
+        params: GetLiveDataByMilestoneParams,
+    ) -> Result<GetLiveDataResponse, KalshiError> {
+        let path = Self::full_path(&format!("/live_data/milestone/{milestone_id}"));
+        self.send(
+            Method::GET,
+            &path,
+            Some(&params),
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
+    pub async fn get_game_stats(
+        &self,
+        milestone_id: &str,
+    ) -> Result<GetGameStatsResponse, KalshiError> {
+        let path = Self::full_path(&format!("/live_data/milestone/{milestone_id}/game_stats"));
+        self.send(
+            Method::GET,
+            &path,
+            Option::<&()>::None,
+            Option::<&()>::None,
+            false,
+        )
+        .await
+    }
+
     pub async fn batch_get_market_candlesticks(
         &self,
         params: BatchGetMarketCandlesticksParams,
@@ -1642,6 +1707,15 @@ impl KalshiRestClient {
             false,
         )
         .await
+    }
+
+    pub async fn get_market_candlesticks_historical(
+        &self,
+        ticker: &str,
+        params: GetMarketCandlesticksHistoricalParams,
+    ) -> Result<GetMarketCandlesticksHistoricalResponse, KalshiError> {
+        self.get_historical_market_candlesticks(ticker, params)
+            .await
     }
 
     pub async fn get_market_candlesticks(

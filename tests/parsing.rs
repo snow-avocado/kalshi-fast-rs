@@ -902,7 +902,21 @@ fn get_market_orderbook_response_deserializes() {
     }"#;
 
     let resp: GetMarketOrderbookResponse = serde_json::from_str(json).unwrap();
-    assert_eq!(resp.orderbook.yes.len(), 1);
+    assert_eq!(resp.orderbook.unwrap().yes.len(), 1);
+    assert!(resp.orderbook_fp.is_some());
+}
+
+#[test]
+fn get_market_orderbook_response_deserializes_fp_only_shape() {
+    let json = r#"{
+        "orderbook_fp": {
+            "yes_dollars": [["0.50", "100.00"]],
+            "no_dollars": [["0.49", "200.00"]]
+        }
+    }"#;
+
+    let resp: GetMarketOrderbookResponse = serde_json::from_str(json).unwrap();
+    assert!(resp.orderbook.is_none());
     assert!(resp.orderbook_fp.is_some());
 }
 

@@ -17,7 +17,10 @@ pub struct WsTicker {
     pub dollar_volume: i64,
     pub dollar_open_interest: i64,
     pub ts: i64,
-    pub ts_ms: i64,
+    /// Spec marks `ts_ms` as required, but the exchange occasionally omits it.
+    /// See `docs/spec-parity.md`.
+    #[serde(default)]
+    pub ts_ms: Option<i64>,
     pub time: String,
 }
 
@@ -47,7 +50,10 @@ pub struct WsTickerRef<'a> {
     pub dollar_volume: i64,
     pub dollar_open_interest: i64,
     pub ts: i64,
-    pub ts_ms: i64,
+    /// Spec marks `ts_ms` as required, but the exchange occasionally omits it.
+    /// See `docs/spec-parity.md`.
+    #[serde(default)]
+    pub ts_ms: Option<i64>,
     #[serde(borrow)]
     pub time: Cow<'a, str>,
 }

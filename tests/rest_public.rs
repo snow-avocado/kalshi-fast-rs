@@ -10,6 +10,35 @@ use kalshi_fast::{
     GetStructuredTargetsParams, GetTradesParams, MarketStatusQuery,
 };
 
+fn assert_market_list_shape(market: &kalshi_fast::Market) {
+    assert!(!market.ticker.is_empty());
+    assert!(
+        market
+            .event_ticker
+            .as_ref()
+            .is_some_and(|value| !value.is_empty())
+    );
+    assert!(market.status.is_some());
+    assert!(
+        market
+            .volume_fp
+            .as_ref()
+            .is_some_and(|value| !value.is_empty())
+    );
+    assert!(
+        market
+            .volume_24h_fp
+            .as_ref()
+            .is_some_and(|value| !value.is_empty())
+    );
+    assert!(
+        market
+            .open_interest_fp
+            .as_ref()
+            .is_some_and(|value| !value.is_empty())
+    );
+}
+
 #[tokio::test]
 async fn test_get_series_list() {
     let client = common::demo_client();
@@ -141,7 +170,14 @@ async fn test_get_markets() {
     .expect("timeout")
     .expect("request failed");
 
+    if resp.markets.is_empty() {
+        return;
+    }
+
     assert!(resp.markets.len() <= 5);
+    for market in &resp.markets {
+        assert_market_list_shape(market);
+    }
 }
 
 #[tokio::test]
@@ -780,8 +816,67 @@ async fn test_get_markets_all() {
     .expect("timeout")
     .expect("request failed");
 
-    if let Some(first) = markets.first() {
-        assert!(!first.ticker.is_empty());
+    if markets.is_empty() {
+        return;
+    }
+
+    for market in &markets {
+        assert_market_list_shape(market);
+        assert_eq!(
+            market.event_ticker.as_deref(),
+            Some(first_event.event_ticker.as_str())
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_get_markets_can_roundtrip_event_filter_for_open_market() {
+    let client = common::demo_client();
+    let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_markets(GetMarketsParams {
+                limit: Some(25),
+                status: Some(MarketStatusQuery::Open),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(seed_market) = resp
+        .markets
+        .into_iter()
+        .find(|market| market.event_ticker.is_some())
+    else {
+        return;
+    };
+
+    assert_market_list_shape(&seed_market);
+
+    let event_ticker = seed_market.event_ticker.clone().unwrap();
+    let event_markets = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_markets(GetMarketsParams {
+                limit: Some(100),
+                event_ticker: Some(vec![event_ticker.clone()]),
+                status: Some(MarketStatusQuery::Open),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    if event_markets.markets.is_empty() {
+        return;
+    }
+
+    for market in &event_markets.markets {
+        assert_market_list_shape(market);
+        assert_eq!(market.event_ticker.as_deref(), Some(event_ticker.as_str()));
     }
 }
 

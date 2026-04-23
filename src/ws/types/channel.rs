@@ -4,14 +4,11 @@ use std::fmt;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WsChannelV2 {
-    // Public (no auth required)
     Ticker,
     Trade,
     MarketLifecycleV2,
     MultivariateMarketLifecycle,
     Multivariate,
-
-    // Private (auth required)
     OrderbookDelta,
     Fill,
     MarketPositions,

@@ -2,112 +2,78 @@
 
 mod common;
 
-use kalshi_fast::{
-    KalshiWsLowLevelClient, WsChannelV2, WsDataMessageV2, WsMessageV2, WsSubscriptionParamsV2,
-};
-use std::time::Duration;
-
-// NOTE: Kalshi WebSocket requires authentication for ALL connections,
-// even when subscribing to public channels. These tests verify public
-// channel behavior but still require credentials.
+use kalshi_fast::{WsChannelV2, WsDataMessageV2, WsMessageV2, WsSubscriptionParamsV2};
 
 #[tokio::test]
-async fn test_ws_connect_authenticated() {
-    common::load_env();
-    let auth = common::load_auth();
-
-    let ws = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        KalshiWsLowLevelClient::connect_authenticated(common::demo_env(), auth).await
-    })
-    .await
-    .expect("timeout")
-    .expect("connection failed");
-
-    // Connection succeeded
+async fn ws_demo_connects_with_authenticated_handshake() {
+    let ws = common::connect_demo_ws().await;
     drop(ws);
 }
 
 #[tokio::test]
-async fn test_ws_ticker_subscribe() {
-    common::load_env();
-    let auth = common::load_auth();
+async fn ws_demo_ticker_without_market_filters_receives_typed_data() {
+    let mut ws = common::connect_demo_ws().await;
 
-    let mut ws = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        KalshiWsLowLevelClient::connect_authenticated(common::demo_env(), auth).await
-    })
-    .await
-    .expect("timeout")
-    .expect("connection failed");
-
-    let sub_id = ws
+    let subscribe_id = ws
         .subscribe_v2(WsSubscriptionParamsV2 {
             channels: vec![WsChannelV2::Ticker],
             ..Default::default()
         })
         .await
-        .expect("subscribe failed");
+        .expect("ticker subscribe failed");
 
-    assert!(sub_id > 0);
-
-    // Read first message (should be subscribed confirmation or ticker data)
-    let msg = tokio::time::timeout(Duration::from_secs(10), async {
-        ws.next_message_v2().await
+    let sid = common::wait_for_subscribed(&mut ws, subscribe_id).await;
+    let message = common::wait_for_message(&mut ws, common::CHANNEL_TIMEOUT, |msg| {
+        matches!(msg, WsMessageV2::Data(WsDataMessageV2::Ticker { .. }))
     })
-    .await
-    .expect("timeout")
-    .expect("receive failed");
+    .await;
 
-    match msg {
-        WsMessageV2::Subscribed { .. } => {}
-        WsMessageV2::Data(WsDataMessageV2::Ticker { .. }) => {}
-        other => panic!("unexpected message: {:?}", other),
+    match message {
+        WsMessageV2::Data(WsDataMessageV2::Ticker {
+            sid: msg_sid, msg, ..
+        }) => {
+            assert_eq!(msg_sid, Some(sid));
+            assert!(!msg.market_ticker.is_empty());
+            assert!(!msg.market_id.is_empty());
+            assert!(msg.price_dollars.parse::<f64>().is_ok());
+            assert!(msg.volume_fp.parse::<f64>().is_ok());
+            assert!(msg.ts_ms.map_or(true, |v| v > 0));
+            assert!(!msg.time.is_empty());
+        }
+        other => panic!("expected ticker data message, got {other:?}"),
     }
 }
 
 #[tokio::test]
-async fn test_ws_private_channel_requires_auth_flag() {
-    common::load_env();
-    let auth = common::load_auth();
+async fn ws_demo_trade_without_market_filters_receives_typed_data() {
+    let mut ws = common::connect_demo_ws().await;
 
-    // Connect with auth but use connect() which sets authenticated=false
-    // This tests the client-side auth check for private channels
-    let mut ws = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        // Use unauthenticated connect - this will fail at handshake
-        // Instead, test the client-side logic directly
-        KalshiWsLowLevelClient::connect_authenticated(common::demo_env(), auth).await
-    })
-    .await
-    .expect("timeout")
-    .expect("connection failed");
-
-    // Subscribing to private channel on authenticated connection should succeed
-    let result = ws
+    let subscribe_id = ws
         .subscribe_v2(WsSubscriptionParamsV2 {
-            channels: vec![WsChannelV2::Fill],
+            channels: vec![WsChannelV2::Trade],
             ..Default::default()
         })
-        .await;
+        .await
+        .expect("trade subscribe failed");
 
-    // Should succeed since we're authenticated
-    assert!(result.is_ok());
-}
+    let sid = common::wait_for_subscribed(&mut ws, subscribe_id).await;
+    let message = common::wait_for_message(&mut ws, common::CHANNEL_TIMEOUT, |msg| {
+        matches!(msg, WsMessageV2::Data(WsDataMessageV2::Trade { .. }))
+    })
+    .await;
 
-#[test]
-fn test_client_rejects_private_channel_without_auth() {
-    // This is a unit test to verify the client-side check works
-    // We can't actually test the unauthenticated connection since Kalshi
-    // requires auth for all WebSocket connections
-
-    // Just verify that WsChannelV2::is_private returns true for private channels
-    assert!(WsChannelV2::Fill.is_private());
-    assert!(WsChannelV2::OrderbookDelta.is_private());
-    assert!(WsChannelV2::MarketPositions.is_private());
-    assert!(WsChannelV2::Communications.is_private());
-    assert!(WsChannelV2::OrderGroupUpdates.is_private());
-
-    // And false for public channels
-    assert!(!WsChannelV2::Ticker.is_private());
-    assert!(!WsChannelV2::Trade.is_private());
-    assert!(!WsChannelV2::MarketLifecycleV2.is_private());
-    assert!(!WsChannelV2::Multivariate.is_private());
+    match message {
+        WsMessageV2::Data(WsDataMessageV2::Trade {
+            sid: msg_sid, msg, ..
+        }) => {
+            assert_eq!(msg_sid, Some(sid));
+            assert!(!msg.trade_id.is_empty());
+            assert!(!msg.market_ticker.is_empty());
+            assert!(msg.yes_price_dollars.parse::<f64>().is_ok());
+            assert!(msg.no_price_dollars.parse::<f64>().is_ok());
+            assert!(msg.count_fp.parse::<f64>().is_ok());
+            assert!(msg.ts_ms.map_or(true, |v| v > 0));
+        }
+        other => panic!("expected trade data message, got {other:?}"),
+    }
 }

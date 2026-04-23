@@ -11,3 +11,12 @@ truth:
 Versioning policy lives in `VERSIONING.md`.
 
 The repo-local refresh workflow lives in `.codex/skills/kalshi-refresh/SKILL.md`.
+
+## Local Auth Files
+
+When working with local Kalshi credentials in this repo:
+
+- `test_key.pem` is the demo private key. Reference `.env.test` for the matching
+  demo key ID and related settings.
+- `.kalshi_api_key.pem` is the live private key. Reference `.env` for the
+  matching live key ID and related settings.

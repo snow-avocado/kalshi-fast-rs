@@ -499,7 +499,16 @@ fn get_balance_response_deserializes() {
 fn get_markets_response_deserializes() {
     let json = r#"{
         "markets": [
-            {"ticker": "MKT-1", "occurrence_datetime": "2026-04-16T18:30:00Z"},
+            {
+                "ticker": "MKT-1",
+                "event_ticker": "EVT-1",
+                "series_ticker": "SERIES-1",
+                "status": "active",
+                "volume_fp": "125.50",
+                "volume_24h_fp": "101.25",
+                "open_interest_fp": "500.00",
+                "occurrence_datetime": "2026-04-16T18:30:00Z"
+            },
             {"ticker": "MKT-2"}
         ],
         "cursor": "next_cursor_token"
@@ -507,6 +516,15 @@ fn get_markets_response_deserializes() {
 
     let resp: kalshi_fast::GetMarketsResponse = serde_json::from_str(json).unwrap();
     assert_eq!(resp.markets.len(), 2);
+    assert_eq!(resp.markets[0].event_ticker.as_deref(), Some("EVT-1"));
+    assert_eq!(resp.markets[0].series_ticker.as_deref(), Some("SERIES-1"));
+    assert_eq!(
+        resp.markets[0].status,
+        Some(kalshi_fast::MarketStatus::Active)
+    );
+    assert_eq!(resp.markets[0].volume_fp.as_deref(), Some("125.50"));
+    assert_eq!(resp.markets[0].volume_24h_fp.as_deref(), Some("101.25"));
+    assert_eq!(resp.markets[0].open_interest_fp.as_deref(), Some("500.00"));
     assert_eq!(
         resp.markets[0].occurrence_datetime.as_deref(),
         Some("2026-04-16T18:30:00Z")

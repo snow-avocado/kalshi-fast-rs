@@ -25,6 +25,12 @@ examples are ambiguous.
 - These behaviors are covered by `tests/ws_command_behavior.rs` and
   `tests/ws_parsing.rs`.
 
+- The AsyncAPI spec marks `ts_ms` as required on both the `trade` and
+  `ticker` channel messages (`WsTrade`, `WsTicker`).
+- In practice the field is occasionally omitted by the exchange. Consumers
+  should treat `ts_ms` as best-effort and fall back to `ts` (seconds) when
+  precise millisecond timing matters.
+
 ## Test Strategy
 
 - Deterministic parsing and behavior checks: `tests/parsing.rs`,

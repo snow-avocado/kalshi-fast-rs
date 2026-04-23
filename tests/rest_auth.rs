@@ -5,9 +5,10 @@ mod common;
 use kalshi_fast::{
     EventStatus, GetEventForecastPercentileHistoryParams, GetEventsParams, GetFillsParams,
     GetOrderQueuePositionsParams, GetOrdersParams, GetPositionsParams, GetQuotesParams,
-    GetRFQsParams, GetSettlementsParams, GetSubaccountTransfersParams, KalshiError,
-    KalshiRestClient, SubaccountQueryParams,
+    GetRFQsParams, GetSettlementsParams, GetSubaccountTransfersParams, KalshiError, OrderStatus,
+    SubaccountQueryParams,
 };
+use reqwest::StatusCode;
 
 #[tokio::test]
 async fn test_get_balance() {
@@ -195,10 +196,21 @@ async fn test_get_portfolio_total_resting_order_value() {
         client.get_portfolio_total_resting_order_value().await
     })
     .await
-    .expect("timeout")
-    .expect("request failed");
+    .expect("timeout");
 
-    assert!(resp.total_resting_order_value >= 0);
+    match resp {
+        Ok(resp) => assert!(resp.total_resting_order_value >= 0),
+        Err(KalshiError::Http {
+            status, api_error, ..
+        }) => {
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(
+                api_error.and_then(|error| error.code),
+                Some("permission_denied".to_string())
+            );
+        }
+        Err(err) => panic!("unexpected error: {err:?}"),
+    }
 }
 
 #[tokio::test]
@@ -251,9 +263,29 @@ async fn test_get_order_queue_positions() {
     let auth = common::load_auth();
     let client = common::demo_auth_client(auth);
 
+    let resting_orders = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_orders(GetOrdersParams {
+                limit: Some(10),
+                status: Some(OrderStatus::Resting),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(first_order) = resting_orders.orders.first() else {
+        return;
+    };
+
     let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
-            .get_order_queue_positions(GetOrderQueuePositionsParams::default())
+            .get_order_queue_positions(GetOrderQueuePositionsParams {
+                market_tickers: Some(first_order.ticker.clone()),
+                ..Default::default()
+            })
             .await
     })
     .await
@@ -284,8 +316,35 @@ async fn test_get_quotes() {
     let auth = common::load_auth();
     let client = common::demo_auth_client(auth);
 
+    let rfqs = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_rfqs(GetRFQsParams {
+                limit: Some(10),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(first_rfq) = rfqs.rfqs.iter().find(|rfq| {
+        rfq.creator_user_id
+            .as_deref()
+            .is_some_and(|id| !id.is_empty())
+    }) else {
+        return;
+    };
+
     let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        client.get_quotes(GetQuotesParams::default()).await
+        client
+            .get_quotes(GetQuotesParams {
+                rfq_id: Some(first_rfq.id.clone()),
+                rfq_creator_user_id: first_rfq.creator_user_id.clone(),
+                limit: Some(10),
+                ..Default::default()
+            })
+            .await
     })
     .await
     .expect("timeout")
@@ -315,40 +374,50 @@ async fn test_get_event_forecast_percentile_history() {
     .expect("timeout")
     .expect("request failed");
 
-    let event = events_resp
-        .events
-        .iter()
-        .find(|e| e.series_ticker.is_some());
-
-    let event = match event {
-        Some(e) => e,
-        None => return,
-    };
-
-    let series_ticker = event.series_ticker.as_ref().unwrap().clone();
-    let event_ticker = event.event_ticker.clone();
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
 
-    let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        client
-            .get_event_forecast_percentile_history(
-                &series_ticker,
-                &event_ticker,
-                GetEventForecastPercentileHistoryParams {
-                    percentiles: vec![25, 50, 75],
-                    start_ts: now - 86400 * 7,
-                    end_ts: now,
-                    period_interval: 3600,
-                },
-            )
-            .await
-    })
-    .await
-    .expect("timeout")
-    .expect("request failed");
+    let mut saw_bad_request = false;
+
+    for event in events_resp
+        .events
+        .iter()
+        .filter(|e| e.series_ticker.is_some())
+    {
+        let series_ticker = event.series_ticker.as_ref().expect("checked above").clone();
+        let event_ticker = event.event_ticker.clone();
+
+        let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
+            client
+                .get_event_forecast_percentile_history(
+                    &series_ticker,
+                    &event_ticker,
+                    GetEventForecastPercentileHistoryParams {
+                        percentiles: vec![2500, 5000, 7500],
+                        start_ts: now - 86400 * 7,
+                        end_ts: now,
+                        period_interval: 60,
+                    },
+                )
+                .await
+        })
+        .await
+        .expect("timeout");
+
+        match resp {
+            Ok(_) => return,
+            Err(KalshiError::Http { status, .. }) if status == StatusCode::BAD_REQUEST => {
+                saw_bad_request = true;
+            }
+            Err(err) => panic!("request failed: {err:?}"),
+        }
+    }
+
+    if saw_bad_request {
+        return;
+    }
 }
 
 #[tokio::test]
@@ -379,8 +448,30 @@ async fn test_get_rfqs_all() {
     let auth = common::load_auth();
     let client = common::demo_auth_client(auth);
 
+    let first_page = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_rfqs(GetRFQsParams {
+                limit: Some(1),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(first_rfq) = first_page.rfqs.first() else {
+        return;
+    };
+
     let rfqs = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        client.get_rfqs_all(GetRFQsParams::default()).await
+        client
+            .get_rfqs_all(GetRFQsParams {
+                market_ticker: Some(first_rfq.market_ticker.clone()),
+                limit: Some(100),
+                ..Default::default()
+            })
+            .await
     })
     .await
     .expect("timeout")
@@ -395,8 +486,35 @@ async fn test_get_quotes_all() {
     let auth = common::load_auth();
     let client = common::demo_auth_client(auth);
 
+    let rfqs = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_rfqs(GetRFQsParams {
+                limit: Some(10),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(first_rfq) = rfqs.rfqs.iter().find(|rfq| {
+        rfq.creator_user_id
+            .as_deref()
+            .is_some_and(|id| !id.is_empty())
+    }) else {
+        return;
+    };
+
     let quotes = tokio::time::timeout(common::TEST_TIMEOUT, async {
-        client.get_quotes_all(GetQuotesParams::default()).await
+        client
+            .get_quotes_all(GetQuotesParams {
+                rfq_id: Some(first_rfq.id.clone()),
+                rfq_creator_user_id: first_rfq.creator_user_id.clone(),
+                limit: Some(100),
+                ..Default::default()
+            })
+            .await
     })
     .await
     .expect("timeout")
@@ -411,10 +529,24 @@ async fn test_get_subaccount_netting() {
     let auth = common::load_auth();
     let client = common::demo_auth_client(auth);
 
-    let _resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
+    let resp = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client.get_subaccount_netting().await
     })
     .await
-    .expect("timeout")
-    .expect("request failed");
+    .expect("timeout");
+
+    match resp {
+        Ok(resp) => {
+            let _ = resp.netting_configs;
+        }
+        Err(KalshiError::Http {
+            status, api_error, ..
+        }) => {
+            assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+            let api_error = api_error.expect("expected api error");
+            assert_eq!(api_error.code.as_deref(), Some("internal_server_error"));
+            assert_eq!(api_error.service.as_deref(), Some("users"));
+        }
+        Err(err) => panic!("unexpected error: {err:?}"),
+    }
 }

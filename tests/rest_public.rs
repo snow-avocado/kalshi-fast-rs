@@ -7,7 +7,7 @@ use kalshi_fast::{
     GetIncentiveProgramsParams, GetMarketCandlesticksParams, GetMarketsParams, GetMilestonesParams,
     GetMultivariateEventCollectionLookupHistoryParams, GetMultivariateEventCollectionsParams,
     GetMultivariateEventsParams, GetSeriesFeeChangesParams, GetSeriesListParams,
-    GetStructuredTargetsParams, GetTradesParams, KalshiRestClient, MarketStatusQuery,
+    GetStructuredTargetsParams, GetTradesParams, MarketStatusQuery,
 };
 
 #[tokio::test]
@@ -208,8 +208,8 @@ async fn test_get_market_orderbook() {
     .expect("timeout")
     .expect("request failed");
 
-    assert!(resp.orderbook.yes.len() <= 1);
-    assert!(resp.orderbook.no.len() <= 1);
+    assert!(resp.orderbook_fp.yes_dollars.len() <= 1);
+    assert!(resp.orderbook_fp.no_dollars.len() <= 1);
 }
 
 #[tokio::test]
@@ -750,11 +750,28 @@ async fn test_get_incentive_programs() {
 #[tokio::test]
 async fn test_get_markets_all() {
     let client = common::demo_client();
+    let events = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_events(GetEventsParams {
+                limit: Some(1),
+                status: Some(EventStatus::Open),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(first_event) = events.events.first() else {
+        return;
+    };
+
     let markets = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_markets_all(GetMarketsParams {
                 limit: Some(100),
-                status: Some(MarketStatusQuery::Open),
+                event_ticker: Some(vec![first_event.event_ticker.clone()]),
                 ..Default::default()
             })
             .await
@@ -811,13 +828,44 @@ async fn test_get_trades_all() {
 #[tokio::test]
 async fn test_get_milestones_all() {
     let client = common::demo_client();
-    let milestones = tokio::time::timeout(common::TEST_TIMEOUT, async {
+    let first_page = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
-            .get_milestones_all(GetMilestonesParams {
-                limit: Some(100),
+            .get_milestones(GetMilestonesParams {
+                limit: Some(5),
                 ..Default::default()
             })
             .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let params = if let Some(related_event_ticker) = first_page
+        .milestones
+        .iter()
+        .find_map(|milestone| milestone.related_event_tickers.first().cloned())
+    {
+        GetMilestonesParams {
+            limit: Some(100),
+            related_event_ticker: Some(related_event_ticker),
+            ..Default::default()
+        }
+    } else if let Some(source_id) = first_page
+        .milestones
+        .iter()
+        .find_map(|milestone| milestone.source_id.clone())
+    {
+        GetMilestonesParams {
+            limit: Some(100),
+            source_id: Some(source_id),
+            ..Default::default()
+        }
+    } else {
+        return;
+    };
+
+    let milestones = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client.get_milestones_all(params).await
     })
     .await
     .expect("timeout")
@@ -831,10 +879,49 @@ async fn test_get_milestones_all() {
 #[tokio::test]
 async fn test_get_multivariate_events_all() {
     let client = common::demo_client();
+    let collections = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_multivariate_event_collections(GetMultivariateEventCollectionsParams {
+                limit: Some(10),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let mut selected_collection = None;
+    for collection in &collections.multivariate_contracts {
+        let collection_ticker = collection.collection_ticker.clone();
+        let page = tokio::time::timeout(common::TEST_TIMEOUT, async {
+            client
+                .get_multivariate_events(GetMultivariateEventsParams {
+                    collection_ticker: Some(collection_ticker.clone()),
+                    limit: Some(1),
+                    ..Default::default()
+                })
+                .await
+        })
+        .await
+        .expect("timeout")
+        .expect("request failed");
+
+        if page.cursor.as_deref().unwrap_or_default().is_empty() {
+            selected_collection = Some(collection_ticker);
+            break;
+        }
+    }
+
+    let Some(collection_ticker) = selected_collection else {
+        return;
+    };
+
     let events = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_multivariate_events_all(GetMultivariateEventsParams {
                 limit: Some(100),
+                collection_ticker: Some(collection_ticker),
                 ..Default::default()
             })
             .await
@@ -871,9 +958,30 @@ async fn test_get_multivariate_event_collections_all() {
 #[tokio::test]
 async fn test_get_structured_targets_all() {
     let client = common::demo_client();
+    let first_page = tokio::time::timeout(common::TEST_TIMEOUT, async {
+        client
+            .get_structured_targets(GetStructuredTargetsParams {
+                page_size: Some(1),
+                ..Default::default()
+            })
+            .await
+    })
+    .await
+    .expect("timeout")
+    .expect("request failed");
+
+    let Some(first_id) = first_page
+        .structured_targets
+        .first()
+        .and_then(|target| target.id.clone())
+    else {
+        return;
+    };
+
     let targets = tokio::time::timeout(common::TEST_TIMEOUT, async {
         client
             .get_structured_targets_all(GetStructuredTargetsParams {
+                ids: Some(vec![first_id]),
                 page_size: Some(100),
                 ..Default::default()
             })

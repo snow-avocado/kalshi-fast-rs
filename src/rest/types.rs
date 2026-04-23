@@ -5,7 +5,7 @@ use crate::types::{
     SelfTradePreventionType, TimeInForce, TradeTakerSide, YesNo, deserialize_null_as_empty_vec,
     deserialize_string_or_number, serialize_csv_opt,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::fmt;
 
@@ -788,22 +788,6 @@ pub struct GetMarketResponse {
 /// --- Orderbook ---
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct Orderbook {
-    /// Price levels: (price_cents, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub yes: Vec<(i64, i64)>,
-    /// Price levels: (price_cents, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub no: Vec<(i64, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub yes_dollars: Vec<(FixedPointDollars, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
-    pub no_dollars: Vec<(FixedPointDollars, i64)>,
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct OrderbookFp {
     /// Price levels: (price_dollars, quantity_fp)
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
@@ -819,9 +803,8 @@ pub struct GetMarketOrderbookParams {
     pub depth: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetMarketOrderbookResponse {
-    pub orderbook: Orderbook,
     pub orderbook_fp: OrderbookFp,
 }
 
@@ -848,24 +831,11 @@ pub struct GetMarketOrderbooksResponse {
 pub struct Trade {
     pub trade_id: String,
     pub ticker: String,
-    #[serde(default)]
-    pub price: Option<f64>,
-    #[serde(default)]
-    pub count: Option<i64>,
-    #[serde(default)]
-    pub count_fp: Option<String>,
-    #[serde(default)]
-    pub yes_price: Option<i64>,
-    #[serde(default)]
-    pub no_price: Option<i64>,
-    #[serde(default)]
-    pub yes_price_dollars: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub no_price_dollars: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub taker_side: Option<TradeTakerSide>,
-    #[serde(default)]
-    pub created_time: Option<String>,
+    pub count_fp: FixedPointCount,
+    pub yes_price_dollars: FixedPointDollars,
+    pub no_price_dollars: FixedPointDollars,
+    pub taker_side: TradeTakerSide,
+    pub created_time: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -1082,47 +1052,24 @@ impl GetPositionsParams {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MarketPosition {
     pub ticker: String,
+    pub total_traded_dollars: FixedPointDollars,
+    pub position_fp: FixedPointCount,
+    pub market_exposure_dollars: FixedPointDollars,
+    pub realized_pnl_dollars: FixedPointDollars,
     #[serde(default)]
-    pub position: Option<i64>,
-    #[serde(default)]
-    pub position_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub fees_paid: Option<i64>,
-    #[serde(default)]
-    pub fees_paid_fp: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub resting_orders: Option<i64>,
-    #[serde(default)]
-    pub resting_orders_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub total_traded: Option<i64>,
-    #[serde(default)]
-    pub total_traded_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub subaccount: Option<u32>,
+    pub resting_orders_count: Option<i32>,
+    pub fees_paid_dollars: FixedPointDollars,
+    pub last_updated_ts: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EventPosition {
     pub event_ticker: String,
-    #[serde(default)]
-    pub position: Option<i64>,
-    #[serde(default)]
-    pub position_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub fees_paid: Option<i64>,
-    #[serde(default)]
-    pub fees_paid_fp: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub resting_orders: Option<i64>,
-    #[serde(default)]
-    pub resting_orders_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub total_traded: Option<i64>,
-    #[serde(default)]
-    pub total_traded_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub subaccount: Option<u32>,
+    pub total_cost_dollars: FixedPointDollars,
+    pub total_cost_shares_fp: FixedPointCount,
+    pub event_exposure_dollars: FixedPointDollars,
+    pub realized_pnl_dollars: FixedPointDollars,
+    pub fees_paid_dollars: FixedPointDollars,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1211,61 +1158,37 @@ impl GetOrdersParams {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Order {
     pub order_id: String,
+    pub user_id: String,
+    pub client_order_id: String,
     pub ticker: String,
+    pub side: YesNo,
+    pub action: BuySell,
+    #[serde(rename = "type")]
+    pub order_type: OrderType,
+    pub status: OrderStatus,
+    pub yes_price_dollars: FixedPointDollars,
+    pub no_price_dollars: FixedPointDollars,
+    pub fill_count_fp: FixedPointCount,
+    pub remaining_count_fp: FixedPointCount,
+    pub initial_count_fp: FixedPointCount,
+    pub taker_fill_cost_dollars: FixedPointDollars,
+    pub maker_fill_cost_dollars: FixedPointDollars,
+    pub taker_fees_dollars: FixedPointDollars,
+    pub maker_fees_dollars: FixedPointDollars,
     #[serde(default)]
-    pub status: Option<OrderStatus>,
-    #[serde(default)]
-    pub side: Option<YesNo>,
-    #[serde(default)]
-    pub action: Option<BuySell>,
-    #[serde(default)]
-    pub count: Option<i64>,
-    #[serde(default)]
-    pub count_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub remaining_count: Option<i64>,
-    #[serde(default)]
-    pub remaining_count_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub filled_count: Option<i64>,
-    #[serde(default)]
-    pub filled_count_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub yes_price: Option<i64>,
-    #[serde(default)]
-    pub no_price: Option<i64>,
-    #[serde(default)]
-    #[serde(alias = "yes_price_fixed")]
-    pub yes_price_dollars: Option<FixedPointDollars>,
-    #[serde(default)]
-    #[serde(alias = "no_price_fixed")]
-    pub no_price_dollars: Option<FixedPointDollars>,
+    pub expiration_time: Option<String>,
     #[serde(default)]
     pub created_time: Option<String>,
     #[serde(default)]
-    pub updated_time: Option<String>,
-    #[serde(default)]
-    pub client_order_id: Option<String>,
+    pub last_update_time: Option<String>,
     #[serde(default)]
     pub order_group_id: Option<String>,
-    #[serde(default, rename = "type", alias = "order_type")]
-    pub order_type: Option<OrderType>,
-    #[serde(default)]
-    pub time_in_force: Option<TimeInForce>,
-    #[serde(default)]
-    pub reduce_only: Option<bool>,
-    #[serde(default)]
-    pub post_only: Option<bool>,
     #[serde(default)]
     pub cancel_order_on_pause: Option<bool>,
     #[serde(default)]
     pub self_trade_prevention_type: Option<SelfTradePreventionType>,
-    #[serde(default)]
-    pub subaccount: Option<u32>,
-    #[serde(default)]
-    pub fees_paid: Option<i64>,
-    #[serde(default)]
-    pub fees_paid_fp: Option<FixedPointDollars>,
+    #[serde(default, rename = "subaccount_number")]
+    pub subaccount_number: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1446,34 +1369,20 @@ pub struct Fill {
     pub order_id: String,
     pub trade_id: String,
     pub ticker: String,
-    #[serde(default)]
-    pub market_ticker: Option<String>,
-    #[serde(default)]
-    pub price: Option<i64>,
-    #[serde(default)]
-    pub count: Option<i64>,
-    #[serde(default)]
-    pub count_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub yes_price: Option<i64>,
-    #[serde(default)]
-    pub no_price: Option<i64>,
-    #[serde(default, alias = "yes_price_fixed")]
-    pub yes_price_dollars: Option<FixedPointDollars>,
-    #[serde(default, alias = "no_price_fixed")]
-    pub no_price_dollars: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub side: Option<YesNo>,
-    #[serde(default)]
-    pub action: Option<BuySell>,
-    #[serde(default)]
-    pub is_taker: Option<bool>,
-    #[serde(default)]
-    pub fee_cost: Option<FixedPointDollars>,
+    pub market_ticker: String,
+    pub side: YesNo,
+    pub action: BuySell,
+    pub count_fp: FixedPointCount,
+    pub yes_price_dollars: FixedPointDollars,
+    pub no_price_dollars: FixedPointDollars,
+    pub is_taker: bool,
+    pub fee_cost: FixedPointDollars,
     #[serde(default)]
     pub created_time: Option<String>,
     #[serde(default)]
     pub subaccount_number: Option<u32>,
+    #[serde(default)]
+    pub ts: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -1506,36 +1415,18 @@ pub struct GetFillsResponse {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Settlement {
-    pub settlement_id: String,
     pub ticker: String,
+    pub event_ticker: String,
+    pub market_result: String,
+    pub yes_count_fp: FixedPointCount,
+    pub yes_total_cost_dollars: FixedPointDollars,
+    pub no_count_fp: FixedPointCount,
+    pub no_total_cost_dollars: FixedPointDollars,
+    pub revenue: i64,
+    pub settled_time: String,
+    pub fee_cost: FixedPointDollars,
     #[serde(default)]
-    pub market_ticker: Option<String>,
-    #[serde(default)]
-    pub event_ticker: Option<String>,
-    #[serde(default)]
-    pub market_result: Option<String>,
-    #[serde(default)]
-    pub yes_count: Option<i64>,
-    #[serde(default)]
-    pub yes_count_fp: Option<FixedPointCount>,
-    #[serde(default, alias = "yes_total_cost")]
-    pub yes_total_cost_dollars: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub no_count: Option<i64>,
-    #[serde(default)]
-    pub no_count_fp: Option<FixedPointCount>,
-    #[serde(default, alias = "no_total_cost")]
-    pub no_total_cost_dollars: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub revenue: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub settled_time: Option<String>,
-    #[serde(default)]
-    pub fee_cost: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub value: Option<FixedPointDollars>,
-    #[serde(default)]
-    pub created_time: Option<String>,
+    pub value: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -1703,13 +1594,9 @@ pub struct Quote {
     pub id: String,
     pub rfq_id: String,
     pub creator_id: String,
-    #[serde(default)]
-    pub rfq_creator_id: Option<String>,
+    pub rfq_creator_id: String,
     pub market_ticker: String,
-    pub contracts: i64,
     pub contracts_fp: FixedPointCount,
-    pub yes_bid: i64,
-    pub no_bid: i64,
     pub yes_bid_dollars: FixedPointDollars,
     pub no_bid_dollars: FixedPointDollars,
     pub created_ts: String,
@@ -1734,8 +1621,6 @@ pub struct Quote {
     #[serde(default)]
     pub rfq_creator_user_id: Option<String>,
     #[serde(default)]
-    pub rfq_target_cost_centi_cents: Option<i64>,
-    #[serde(default)]
     pub rfq_target_cost_dollars: Option<FixedPointDollars>,
     #[serde(default)]
     pub rfq_creator_order_id: Option<String>,
@@ -1754,10 +1639,7 @@ pub struct RFQ {
     pub id: String,
     pub creator_id: String,
     pub market_ticker: String,
-    pub contracts: i64,
     pub contracts_fp: FixedPointCount,
-    #[serde(default)]
-    pub target_cost_centi_cents: Option<i64>,
     #[serde(default)]
     pub target_cost_dollars: Option<FixedPointDollars>,
     pub status: String,
@@ -2465,6 +2347,12 @@ pub struct GetOrderQueuePositionsParams {
     pub subaccount: Option<u32>,
 }
 
+impl GetOrderQueuePositionsParams {
+    pub fn validate(&self) -> Result<(), KalshiError> {
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetOrderQueuePositionsResponse {
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
@@ -2680,6 +2568,7 @@ pub struct PercentilePoint {
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct GetStructuredTargetsParams {
+    pub ids: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "type")]
     pub target_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2739,86 +2628,4 @@ pub struct SubaccountNettingConfig {
 pub struct GetSubaccountNettingResponse {
     #[serde(default, deserialize_with = "deserialize_null_as_empty_vec")]
     pub netting_configs: Vec<SubaccountNettingConfig>,
-}
-
-#[derive(Debug, Deserialize)]
-struct GetMarketOrderbookResponseWire {
-    #[serde(default)]
-    orderbook: Option<Orderbook>,
-    #[serde(default)]
-    orderbook_fp: Option<OrderbookFp>,
-}
-
-fn dollars_to_cents(value: &str) -> Option<i64> {
-    let (whole, frac) = value.split_once('.').unwrap_or((value, "0"));
-    let mut cents = frac.chars().take(2).collect::<String>();
-    while cents.len() < 2 {
-        cents.push('0');
-    }
-    Some(whole.parse::<i64>().ok()? * 100 + cents.parse::<i64>().ok()?)
-}
-
-fn fixed_point_count_to_i64(value: &str) -> Option<i64> {
-    value.split('.').next()?.parse::<i64>().ok()
-}
-
-fn synthesize_orderbook_from_fp(orderbook_fp: &OrderbookFp) -> Orderbook {
-    let convert = |levels: &[(FixedPointDollars, String)]| {
-        levels
-            .iter()
-            .filter_map(|(price, count)| {
-                Some((dollars_to_cents(price)?, fixed_point_count_to_i64(count)?))
-            })
-            .collect::<Vec<_>>()
-    };
-
-    Orderbook {
-        yes: convert(&orderbook_fp.yes_dollars),
-        no: convert(&orderbook_fp.no_dollars),
-        yes_dollars: orderbook_fp
-            .yes_dollars
-            .iter()
-            .filter_map(|(price, count)| Some((price.clone(), fixed_point_count_to_i64(count)?)))
-            .collect(),
-        no_dollars: orderbook_fp
-            .no_dollars
-            .iter()
-            .filter_map(|(price, count)| Some((price.clone(), fixed_point_count_to_i64(count)?)))
-            .collect(),
-    }
-}
-
-fn synthesize_orderbook_fp(orderbook: &Orderbook) -> OrderbookFp {
-    let convert = |levels: &[(FixedPointDollars, i64)]| {
-        levels
-            .iter()
-            .map(|(price, count)| (price.clone(), format!("{count}.00")))
-            .collect::<Vec<_>>()
-    };
-
-    OrderbookFp {
-        yes_dollars: convert(&orderbook.yes_dollars),
-        no_dollars: convert(&orderbook.no_dollars),
-    }
-}
-
-impl<'de> Deserialize<'de> for GetMarketOrderbookResponse {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let wire = GetMarketOrderbookResponseWire::deserialize(deserializer)?;
-        let orderbook_fp = wire
-            .orderbook_fp
-            .or_else(|| wire.orderbook.as_ref().map(synthesize_orderbook_fp))
-            .unwrap_or_default();
-        let orderbook = wire
-            .orderbook
-            .unwrap_or_else(|| synthesize_orderbook_from_fp(&orderbook_fp));
-
-        Ok(Self {
-            orderbook,
-            orderbook_fp,
-        })
-    }
 }

@@ -3,8 +3,8 @@
 mod common;
 
 use kalshi_fast::{
-    GetMarketsParams, KalshiRestClient, KalshiWsLowLevelClient, MarketStatusQuery, WsChannelV2,
-    WsDataMessageV2, WsMessageV2, WsSubscriptionParamsV2,
+    GetMarketsParams, KalshiWsLowLevelClient, MarketStatusQuery, WsChannelV2, WsDataMessageV2,
+    WsMessageV2, WsSubscriptionParamsV2,
 };
 use std::time::Duration;
 

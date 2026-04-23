@@ -29,6 +29,7 @@ pub fn demo_env() -> KalshiEnvironment {
     KalshiEnvironment::demo()
 }
 
+#[allow(dead_code)]
 pub fn demo_client() -> KalshiRestClient {
     KalshiRestClient::builder(demo_env())
         .with_rate_limit_config(RateLimitConfig {
@@ -46,6 +47,7 @@ pub fn demo_client() -> KalshiRestClient {
         .expect("build live test client")
 }
 
+#[allow(dead_code)]
 pub fn demo_auth_client(auth: KalshiAuth) -> KalshiRestClient {
     KalshiRestClient::builder(demo_env())
         .with_auth(auth)

@@ -313,23 +313,13 @@ pub struct WsSubscriptionInfo {
 pub struct WsTicker {
     pub market_ticker: String,
     pub market_id: String,
-    #[serde(default)]
-    pub price: i64,
-    #[serde(default)]
-    pub yes_bid: i64,
-    #[serde(default)]
-    pub yes_ask: i64,
     pub price_dollars: String,
     pub yes_bid_dollars: String,
     pub yes_ask_dollars: String,
     pub yes_bid_size_fp: String,
     pub yes_ask_size_fp: String,
     pub last_trade_size_fp: String,
-    #[serde(default)]
-    pub volume: i64,
     pub volume_fp: String,
-    #[serde(default)]
-    pub open_interest: i64,
     pub open_interest_fp: String,
     pub dollar_volume: i64,
     pub dollar_open_interest: i64,
@@ -344,15 +334,7 @@ pub struct WsTrade {
     pub trade_id: String,
     #[serde(alias = "ticker")]
     pub market_ticker: String,
-    #[serde(default)]
-    pub price: Option<i64>,
-    #[serde(default)]
-    pub count: Option<i64>,
     pub count_fp: String,
-    #[serde(default)]
-    pub yes_price: Option<i64>,
-    #[serde(default)]
-    pub no_price: Option<i64>,
     pub yes_price_dollars: String,
     pub no_price_dollars: String,
     pub taker_side: TradeTakerSide,
@@ -367,18 +349,6 @@ pub struct WsTrade {
 pub struct WsOrderbookSnapshot {
     pub market_ticker: String,
     pub market_id: String,
-    /// Price levels: (price_cents, quantity)
-    #[serde(default)]
-    pub yes: Vec<(i64, i64)>,
-    /// Price levels: (price_cents, quantity)
-    #[serde(default)]
-    pub no: Vec<(i64, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default)]
-    pub yes_dollars: Vec<(String, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default)]
-    pub no_dollars: Vec<(String, i64)>,
     /// Price levels: (price_dollars, quantity_fp) - fully fixed-point
     #[serde(default)]
     pub yes_dollars_fp: Vec<(String, String)>,
@@ -392,11 +362,7 @@ pub struct WsOrderbookSnapshot {
 pub struct WsOrderbookDelta {
     pub market_ticker: String,
     pub market_id: String,
-    #[serde(default)]
-    pub price: i64,
     pub price_dollars: String,
-    #[serde(default)]
-    pub delta: i64,
     pub delta_fp: String,
     pub side: YesNo,
     #[serde(default)]
@@ -420,17 +386,8 @@ pub struct WsFill {
     pub market_ticker: String,
     pub side: YesNo,
     pub action: BuySell,
-    #[serde(default)]
-    pub count: i64,
     pub count_fp: String,
-    #[serde(default)]
-    pub yes_price: i64,
-    #[serde(default)]
-    pub no_price: i64,
-    #[serde(alias = "yes_price_fixed")]
     pub yes_price_dollars: String,
-    #[serde(default, alias = "no_price_fixed")]
-    pub no_price_dollars: Option<String>,
     pub is_taker: bool,
     pub fee_cost: String,
     pub ts: i64,
@@ -669,11 +626,7 @@ pub struct WsRfqCreated {
     #[serde(default)]
     pub event_ticker: Option<String>,
     #[serde(default)]
-    pub contracts: Option<i64>,
-    #[serde(default)]
     pub contracts_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub target_cost: Option<i64>,
     #[serde(default)]
     pub target_cost_dollars: Option<FixedPointDollars>,
     pub created_ts: String,
@@ -691,11 +644,7 @@ pub struct WsRfqDeleted {
     #[serde(default)]
     pub event_ticker: Option<String>,
     #[serde(default)]
-    pub contracts: Option<i64>,
-    #[serde(default)]
     pub contracts_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub target_cost: Option<i64>,
     #[serde(default)]
     pub target_cost_dollars: Option<FixedPointDollars>,
     pub deleted_ts: String,
@@ -709,20 +658,12 @@ pub struct WsQuoteCreated {
     pub market_ticker: String,
     #[serde(default)]
     pub event_ticker: Option<String>,
-    pub yes_bid: i64,
-    pub no_bid: i64,
     pub yes_bid_dollars: FixedPointDollars,
     pub no_bid_dollars: FixedPointDollars,
-    #[serde(default)]
-    pub yes_contracts_offered: Option<i64>,
-    #[serde(default)]
-    pub no_contracts_offered: Option<i64>,
     #[serde(default)]
     pub yes_contracts_offered_fp: Option<FixedPointCount>,
     #[serde(default)]
     pub no_contracts_offered_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub rfq_target_cost: Option<i64>,
     #[serde(default)]
     pub rfq_target_cost_dollars: Option<FixedPointDollars>,
     pub created_ts: String,
@@ -736,26 +677,16 @@ pub struct WsQuoteAccepted {
     pub market_ticker: String,
     #[serde(default)]
     pub event_ticker: Option<String>,
-    pub yes_bid: i64,
-    pub no_bid: i64,
     pub yes_bid_dollars: FixedPointDollars,
     pub no_bid_dollars: FixedPointDollars,
     #[serde(default)]
     pub accepted_side: Option<YesNo>,
-    #[serde(default)]
-    pub contracts_accepted: Option<i64>,
-    #[serde(default)]
-    pub yes_contracts_offered: Option<i64>,
-    #[serde(default)]
-    pub no_contracts_offered: Option<i64>,
     #[serde(default)]
     pub contracts_accepted_fp: Option<FixedPointCount>,
     #[serde(default)]
     pub yes_contracts_offered_fp: Option<FixedPointCount>,
     #[serde(default)]
     pub no_contracts_offered_fp: Option<FixedPointCount>,
-    #[serde(default)]
-    pub rfq_target_cost: Option<i64>,
     #[serde(default)]
     pub rfq_target_cost_dollars: Option<FixedPointDollars>,
 }
@@ -792,39 +723,33 @@ pub type FixedPointCountRef<'a> = Cow<'a, str>;
 pub struct MarketPositionRef<'a> {
     #[serde(borrow)]
     pub ticker: Cow<'a, str>,
+    #[serde(borrow)]
+    pub total_traded_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub position_fp: FixedPointCountRef<'a>,
+    #[serde(borrow)]
+    pub market_exposure_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub realized_pnl_dollars: FixedPointDollarsRef<'a>,
     #[serde(default)]
-    pub position: Option<i64>,
-    #[serde(default, borrow)]
-    pub position_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub fees_paid: Option<i64>,
-    #[serde(default, borrow)]
-    pub fees_paid_fp: Option<FixedPointDollarsRef<'a>>,
-    #[serde(default)]
-    pub resting_orders: Option<i64>,
-    #[serde(default, borrow)]
-    pub resting_orders_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub total_traded: Option<i64>,
-    #[serde(default, borrow)]
-    pub total_traded_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub subaccount: Option<u32>,
+    pub resting_orders_count: Option<i32>,
+    #[serde(borrow)]
+    pub fees_paid_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub last_updated_ts: Cow<'a, str>,
 }
 
 impl<'a> MarketPositionRef<'a> {
     pub fn into_owned(self) -> MarketPosition {
         MarketPosition {
             ticker: self.ticker.into_owned(),
-            position: self.position,
-            position_fp: self.position_fp.map(Cow::into_owned),
-            fees_paid: self.fees_paid,
-            fees_paid_fp: self.fees_paid_fp.map(Cow::into_owned),
-            resting_orders: self.resting_orders,
-            resting_orders_fp: self.resting_orders_fp.map(Cow::into_owned),
-            total_traded: self.total_traded,
-            total_traded_fp: self.total_traded_fp.map(Cow::into_owned),
-            subaccount: self.subaccount,
+            total_traded_dollars: self.total_traded_dollars.into_owned(),
+            position_fp: self.position_fp.into_owned(),
+            market_exposure_dollars: self.market_exposure_dollars.into_owned(),
+            realized_pnl_dollars: self.realized_pnl_dollars.into_owned(),
+            resting_orders_count: self.resting_orders_count,
+            fees_paid_dollars: self.fees_paid_dollars.into_owned(),
+            last_updated_ts: self.last_updated_ts.into_owned(),
         }
     }
 }
@@ -833,39 +758,27 @@ impl<'a> MarketPositionRef<'a> {
 pub struct EventPositionRef<'a> {
     #[serde(borrow)]
     pub event_ticker: Cow<'a, str>,
-    #[serde(default)]
-    pub position: Option<i64>,
-    #[serde(default, borrow)]
-    pub position_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub fees_paid: Option<i64>,
-    #[serde(default, borrow)]
-    pub fees_paid_fp: Option<FixedPointDollarsRef<'a>>,
-    #[serde(default)]
-    pub resting_orders: Option<i64>,
-    #[serde(default, borrow)]
-    pub resting_orders_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub total_traded: Option<i64>,
-    #[serde(default, borrow)]
-    pub total_traded_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub subaccount: Option<u32>,
+    #[serde(borrow)]
+    pub total_cost_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub total_cost_shares_fp: FixedPointCountRef<'a>,
+    #[serde(borrow)]
+    pub event_exposure_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub realized_pnl_dollars: FixedPointDollarsRef<'a>,
+    #[serde(borrow)]
+    pub fees_paid_dollars: FixedPointDollarsRef<'a>,
 }
 
 impl<'a> EventPositionRef<'a> {
     pub fn into_owned(self) -> EventPosition {
         EventPosition {
             event_ticker: self.event_ticker.into_owned(),
-            position: self.position,
-            position_fp: self.position_fp.map(Cow::into_owned),
-            fees_paid: self.fees_paid,
-            fees_paid_fp: self.fees_paid_fp.map(Cow::into_owned),
-            resting_orders: self.resting_orders,
-            resting_orders_fp: self.resting_orders_fp.map(Cow::into_owned),
-            total_traded: self.total_traded,
-            total_traded_fp: self.total_traded_fp.map(Cow::into_owned),
-            subaccount: self.subaccount,
+            total_cost_dollars: self.total_cost_dollars.into_owned(),
+            total_cost_shares_fp: self.total_cost_shares_fp.into_owned(),
+            event_exposure_dollars: self.event_exposure_dollars.into_owned(),
+            realized_pnl_dollars: self.realized_pnl_dollars.into_owned(),
+            fees_paid_dollars: self.fees_paid_dollars.into_owned(),
         }
     }
 }
@@ -923,12 +836,6 @@ pub struct WsTickerRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(borrow)]
     pub market_id: Cow<'a, str>,
-    #[serde(default)]
-    pub price: i64,
-    #[serde(default)]
-    pub yes_bid: i64,
-    #[serde(default)]
-    pub yes_ask: i64,
     #[serde(borrow)]
     pub price_dollars: Cow<'a, str>,
     #[serde(borrow)]
@@ -941,12 +848,8 @@ pub struct WsTickerRef<'a> {
     pub yes_ask_size_fp: Cow<'a, str>,
     #[serde(borrow)]
     pub last_trade_size_fp: Cow<'a, str>,
-    #[serde(default)]
-    pub volume: i64,
     #[serde(borrow)]
     pub volume_fp: Cow<'a, str>,
-    #[serde(default)]
-    pub open_interest: i64,
     #[serde(borrow)]
     pub open_interest_fp: Cow<'a, str>,
     pub dollar_volume: i64,
@@ -962,18 +865,13 @@ impl<'a> WsTickerRef<'a> {
         WsTicker {
             market_ticker: self.market_ticker.into_owned(),
             market_id: self.market_id.into_owned(),
-            price: self.price,
-            yes_bid: self.yes_bid,
-            yes_ask: self.yes_ask,
             price_dollars: self.price_dollars.into_owned(),
             yes_bid_dollars: self.yes_bid_dollars.into_owned(),
             yes_ask_dollars: self.yes_ask_dollars.into_owned(),
             yes_bid_size_fp: self.yes_bid_size_fp.into_owned(),
             yes_ask_size_fp: self.yes_ask_size_fp.into_owned(),
             last_trade_size_fp: self.last_trade_size_fp.into_owned(),
-            volume: self.volume,
             volume_fp: self.volume_fp.into_owned(),
-            open_interest: self.open_interest,
             open_interest_fp: self.open_interest_fp.into_owned(),
             dollar_volume: self.dollar_volume,
             dollar_open_interest: self.dollar_open_interest,
@@ -991,16 +889,8 @@ pub struct WsTradeRef<'a> {
     pub trade_id: Cow<'a, str>,
     #[serde(alias = "ticker", borrow)]
     pub market_ticker: Cow<'a, str>,
-    #[serde(default)]
-    pub price: Option<i64>,
-    #[serde(default)]
-    pub count: Option<i64>,
     #[serde(borrow)]
     pub count_fp: Cow<'a, str>,
-    #[serde(default)]
-    pub yes_price: Option<i64>,
-    #[serde(default)]
-    pub no_price: Option<i64>,
     #[serde(borrow)]
     pub yes_price_dollars: Cow<'a, str>,
     #[serde(borrow)]
@@ -1017,11 +907,7 @@ impl<'a> WsTradeRef<'a> {
         WsTrade {
             trade_id: self.trade_id.into_owned(),
             market_ticker: self.market_ticker.into_owned(),
-            price: self.price,
-            count: self.count,
             count_fp: self.count_fp.into_owned(),
-            yes_price: self.yes_price,
-            no_price: self.no_price,
             yes_price_dollars: self.yes_price_dollars.into_owned(),
             no_price_dollars: self.no_price_dollars.into_owned(),
             taker_side: self.taker_side,
@@ -1039,18 +925,6 @@ pub struct WsOrderbookSnapshotRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(borrow)]
     pub market_id: Cow<'a, str>,
-    /// Price levels: (price_cents, quantity)
-    #[serde(default)]
-    pub yes: Vec<(i64, i64)>,
-    /// Price levels: (price_cents, quantity)
-    #[serde(default)]
-    pub no: Vec<(i64, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default, borrow)]
-    pub yes_dollars: Vec<(Cow<'a, str>, i64)>,
-    /// Price levels: (price_dollars, quantity)
-    #[serde(default, borrow)]
-    pub no_dollars: Vec<(Cow<'a, str>, i64)>,
     /// Price levels: (price_dollars, quantity_fp) - fully fixed-point
     #[serde(default, borrow)]
     pub yes_dollars_fp: Vec<(Cow<'a, str>, Cow<'a, str>)>,
@@ -1064,18 +938,6 @@ impl<'a> WsOrderbookSnapshotRef<'a> {
         WsOrderbookSnapshot {
             market_ticker: self.market_ticker.into_owned(),
             market_id: self.market_id.into_owned(),
-            yes: self.yes,
-            no: self.no,
-            yes_dollars: self
-                .yes_dollars
-                .into_iter()
-                .map(|(p, q)| (p.into_owned(), q))
-                .collect(),
-            no_dollars: self
-                .no_dollars
-                .into_iter()
-                .map(|(p, q)| (p.into_owned(), q))
-                .collect(),
             yes_dollars_fp: self
                 .yes_dollars_fp
                 .into_iter()
@@ -1097,12 +959,8 @@ pub struct WsOrderbookDeltaRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(borrow)]
     pub market_id: Cow<'a, str>,
-    #[serde(default)]
-    pub price: i64,
     #[serde(borrow)]
     pub price_dollars: Cow<'a, str>,
-    #[serde(default)]
-    pub delta: i64,
     #[serde(borrow)]
     pub delta_fp: Cow<'a, str>,
     pub side: YesNo,
@@ -1121,9 +979,7 @@ impl<'a> WsOrderbookDeltaRef<'a> {
         WsOrderbookDelta {
             market_ticker: self.market_ticker.into_owned(),
             market_id: self.market_id.into_owned(),
-            price: self.price,
             price_dollars: self.price_dollars.into_owned(),
-            delta: self.delta,
             delta_fp: self.delta_fp.into_owned(),
             side: self.side,
             client_order_id: self.client_order_id.map(Cow::into_owned),
@@ -1147,18 +1003,9 @@ pub struct WsFillRef<'a> {
     pub market_ticker: Cow<'a, str>,
     pub side: YesNo,
     pub action: BuySell,
-    #[serde(default)]
-    pub count: i64,
     #[serde(borrow)]
     pub count_fp: Cow<'a, str>,
-    #[serde(default)]
-    pub yes_price: i64,
-    #[serde(default)]
-    pub no_price: i64,
-    #[serde(alias = "yes_price_fixed", borrow)]
     pub yes_price_dollars: Cow<'a, str>,
-    #[serde(default, alias = "no_price_fixed", borrow)]
-    pub no_price_dollars: Option<Cow<'a, str>>,
     pub is_taker: bool,
     #[serde(borrow)]
     pub fee_cost: Cow<'a, str>,
@@ -1183,12 +1030,8 @@ impl<'a> WsFillRef<'a> {
             market_ticker: self.market_ticker.into_owned(),
             side: self.side,
             action: self.action,
-            count: self.count,
             count_fp: self.count_fp.into_owned(),
-            yes_price: self.yes_price,
-            no_price: self.no_price,
             yes_price_dollars: self.yes_price_dollars.into_owned(),
-            no_price_dollars: self.no_price_dollars.map(Cow::into_owned),
             is_taker: self.is_taker,
             fee_cost: self.fee_cost.into_owned(),
             ts: self.ts,
@@ -1498,12 +1341,8 @@ pub struct WsRfqCreatedRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(default, borrow)]
     pub event_ticker: Option<Cow<'a, str>>,
-    #[serde(default)]
-    pub contracts: Option<i64>,
     #[serde(default, borrow)]
     pub contracts_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub target_cost: Option<i64>,
     #[serde(default, borrow)]
     pub target_cost_dollars: Option<FixedPointDollarsRef<'a>>,
     #[serde(borrow)]
@@ -1521,9 +1360,7 @@ impl<'a> WsRfqCreatedRef<'a> {
             creator_id: self.creator_id.into_owned(),
             market_ticker: self.market_ticker.into_owned(),
             event_ticker: self.event_ticker.map(Cow::into_owned),
-            contracts: self.contracts,
             contracts_fp: self.contracts_fp.map(Cow::into_owned),
-            target_cost: self.target_cost,
             target_cost_dollars: self.target_cost_dollars.map(Cow::into_owned),
             created_ts: self.created_ts.into_owned(),
             mve_collection_ticker: self.mve_collection_ticker.map(Cow::into_owned),
@@ -1546,12 +1383,8 @@ pub struct WsRfqDeletedRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(default, borrow)]
     pub event_ticker: Option<Cow<'a, str>>,
-    #[serde(default)]
-    pub contracts: Option<i64>,
     #[serde(default, borrow)]
     pub contracts_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub target_cost: Option<i64>,
     #[serde(default, borrow)]
     pub target_cost_dollars: Option<FixedPointDollarsRef<'a>>,
     #[serde(borrow)]
@@ -1565,9 +1398,7 @@ impl<'a> WsRfqDeletedRef<'a> {
             creator_id: self.creator_id.into_owned(),
             market_ticker: self.market_ticker.into_owned(),
             event_ticker: self.event_ticker.map(Cow::into_owned),
-            contracts: self.contracts,
             contracts_fp: self.contracts_fp.map(Cow::into_owned),
-            target_cost: self.target_cost,
             target_cost_dollars: self.target_cost_dollars.map(Cow::into_owned),
             deleted_ts: self.deleted_ts.into_owned(),
         }
@@ -1586,22 +1417,14 @@ pub struct WsQuoteCreatedRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(default, borrow)]
     pub event_ticker: Option<Cow<'a, str>>,
-    pub yes_bid: i64,
-    pub no_bid: i64,
     #[serde(borrow)]
     pub yes_bid_dollars: FixedPointDollarsRef<'a>,
     #[serde(borrow)]
     pub no_bid_dollars: FixedPointDollarsRef<'a>,
-    #[serde(default)]
-    pub yes_contracts_offered: Option<i64>,
-    #[serde(default)]
-    pub no_contracts_offered: Option<i64>,
     #[serde(default, borrow)]
     pub yes_contracts_offered_fp: Option<FixedPointCountRef<'a>>,
     #[serde(default, borrow)]
     pub no_contracts_offered_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub rfq_target_cost: Option<i64>,
     #[serde(default, borrow)]
     pub rfq_target_cost_dollars: Option<FixedPointDollarsRef<'a>>,
     #[serde(borrow)]
@@ -1616,15 +1439,10 @@ impl<'a> WsQuoteCreatedRef<'a> {
             quote_creator_id: self.quote_creator_id.into_owned(),
             market_ticker: self.market_ticker.into_owned(),
             event_ticker: self.event_ticker.map(Cow::into_owned),
-            yes_bid: self.yes_bid,
-            no_bid: self.no_bid,
             yes_bid_dollars: self.yes_bid_dollars.into_owned(),
             no_bid_dollars: self.no_bid_dollars.into_owned(),
-            yes_contracts_offered: self.yes_contracts_offered,
-            no_contracts_offered: self.no_contracts_offered,
             yes_contracts_offered_fp: self.yes_contracts_offered_fp.map(Cow::into_owned),
             no_contracts_offered_fp: self.no_contracts_offered_fp.map(Cow::into_owned),
-            rfq_target_cost: self.rfq_target_cost,
             rfq_target_cost_dollars: self.rfq_target_cost_dollars.map(Cow::into_owned),
             created_ts: self.created_ts.into_owned(),
         }
@@ -1643,28 +1461,18 @@ pub struct WsQuoteAcceptedRef<'a> {
     pub market_ticker: Cow<'a, str>,
     #[serde(default, borrow)]
     pub event_ticker: Option<Cow<'a, str>>,
-    pub yes_bid: i64,
-    pub no_bid: i64,
     #[serde(borrow)]
     pub yes_bid_dollars: FixedPointDollarsRef<'a>,
     #[serde(borrow)]
     pub no_bid_dollars: FixedPointDollarsRef<'a>,
     #[serde(default)]
     pub accepted_side: Option<YesNo>,
-    #[serde(default)]
-    pub contracts_accepted: Option<i64>,
-    #[serde(default)]
-    pub yes_contracts_offered: Option<i64>,
-    #[serde(default)]
-    pub no_contracts_offered: Option<i64>,
     #[serde(default, borrow)]
     pub contracts_accepted_fp: Option<FixedPointCountRef<'a>>,
     #[serde(default, borrow)]
     pub yes_contracts_offered_fp: Option<FixedPointCountRef<'a>>,
     #[serde(default, borrow)]
     pub no_contracts_offered_fp: Option<FixedPointCountRef<'a>>,
-    #[serde(default)]
-    pub rfq_target_cost: Option<i64>,
     #[serde(default, borrow)]
     pub rfq_target_cost_dollars: Option<FixedPointDollarsRef<'a>>,
 }
@@ -1677,18 +1485,12 @@ impl<'a> WsQuoteAcceptedRef<'a> {
             quote_creator_id: self.quote_creator_id.into_owned(),
             market_ticker: self.market_ticker.into_owned(),
             event_ticker: self.event_ticker.map(Cow::into_owned),
-            yes_bid: self.yes_bid,
-            no_bid: self.no_bid,
             yes_bid_dollars: self.yes_bid_dollars.into_owned(),
             no_bid_dollars: self.no_bid_dollars.into_owned(),
             accepted_side: self.accepted_side,
-            contracts_accepted: self.contracts_accepted,
-            yes_contracts_offered: self.yes_contracts_offered,
-            no_contracts_offered: self.no_contracts_offered,
             contracts_accepted_fp: self.contracts_accepted_fp.map(Cow::into_owned),
             yes_contracts_offered_fp: self.yes_contracts_offered_fp.map(Cow::into_owned),
             no_contracts_offered_fp: self.no_contracts_offered_fp.map(Cow::into_owned),
-            rfq_target_cost: self.rfq_target_cost,
             rfq_target_cost_dollars: self.rfq_target_cost_dollars.map(Cow::into_owned),
         }
     }
@@ -3581,9 +3383,7 @@ mod tests {
         let json = r#"{
             "market_ticker":"TEST",
             "market_id":"1",
-            "price":1,
             "price_dollars":"0.01",
-            "delta":1,
             "delta_fp":"1",
             "side":"yes"
         }"#;

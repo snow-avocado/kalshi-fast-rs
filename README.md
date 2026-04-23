@@ -15,6 +15,11 @@ High-performance async Rust client for the [Kalshi](https://kalshi.com) Trade AP
 - Explicit WebSocket lifecycle controls: `close()` + configurable `shutdown_timeout(...)`
 - Pager/stream/all helpers for cursor endpoints
 
+## Release Notes and Versioning
+
+- [`CHANGELOG.md`](CHANGELOG.md) records release history, compatibility blocks, and categorized change notes.
+- [`VERSIONING.md`](VERSIONING.md) defines crate version bump rules and explains how upstream Kalshi compatibility is tracked separately from the Cargo version.
+
 ## Installation
 
 ```sh
@@ -55,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
 
 ```rust
 use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannel, WsDataMessage, WsEvent, WsMessage,
+    KalshiAuth, KalshiEnvironment, KalshiWsClient, WsChannelV2, WsDataMessageV2, WsEvent, WsMessageV2,
     WsReconnectConfig, WsSubscriptionParamsV2,
 };
 
@@ -73,12 +78,12 @@ async fn main() -> anyhow::Result<()> {
     ).await?;
 
     ws.subscribe_v2(WsSubscriptionParamsV2 {
-        channels: vec![WsChannel::UserOrders],
+        channels: vec![WsChannelV2::UserOrders],
         ..Default::default()
     }).await?;
 
     while let Ok(event) = ws.next_event_v2().await {
-        if let WsEvent::Message(WsMessage::Data(WsDataMessage::UserOrder { msg, .. })) = event {
+        if let WsEvent::Message(WsMessageV2::Data(WsDataMessageV2::UserOrder { msg, .. })) = event {
             println!("order={} ticker={} status={:?}", msg.order_id, msg.ticker, msg.status);
         }
     }
@@ -110,6 +115,8 @@ async fn main() -> anyhow::Result<()> {
 
 ## References
 
+- [Project changelog](CHANGELOG.md)
+- [Project versioning policy](VERSIONING.md)
 - [Kalshi OpenAPI](https://docs.kalshi.com/openapi.yaml)
 - [Kalshi AsyncAPI](https://docs.kalshi.com/asyncapi.yaml)
 - [Kalshi WebSocket Quickstart](https://docs.kalshi.com/getting_started/quick_start_websockets)

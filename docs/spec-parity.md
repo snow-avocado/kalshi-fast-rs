@@ -31,6 +31,16 @@ examples are ambiguous.
   should treat `ts_ms` as best-effort and fall back to `ts` (seconds) when
   precise millisecond timing matters.
 
+- The `side` and `action` fields on `Order`, `Fill`, and `WsFill` were deprecated by Kalshi on
+  2026-05-07 and removed ~2026-05-28. The new normalized fields are `outcome_side` (`yes` | `no`)
+  and `book_side` (`bid` | `ask`), where `bid` ≡ `yes` and `ask` ≡ `no`. All four fields are now
+  `Option` to tolerate responses that carry the old fields, the new fields, or both during any
+  transition window.
+
+- The `/margin/fee_tiers` response was restructured on 2026-05-11. The previous tier-name maps
+  (`maker_fee_tiers`, `taker_fee_tiers`) were replaced by per-ticker decimal-rate maps
+  (`maker_fee_rates`, `taker_fee_rates`). Fee is computed as `notional * rate`.
+
 ## Test Strategy
 
 - Deterministic parsing and behavior checks: `tests/parsing.rs`,

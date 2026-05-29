@@ -42,6 +42,8 @@ pub enum WsMarketLifecycleEventType {
     Settled,
     FractionalTradingUpdated,
     PriceLevelStructureUpdated,
+    /// Fires when market metadata (name, title, subtitles, etc.) changes. Added 2026-05-11.
+    MetadataUpdated,
     #[serde(other)]
     Unknown,
 }

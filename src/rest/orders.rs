@@ -9,7 +9,7 @@ use crate::rest::client::KalshiRestClient;
 use crate::rest::pagination::{CursorPager, stream_items};
 use crate::rest::portfolio::GetPositionsResponse;
 use crate::types::{
-    BuySell, ErrorResponse, FixedPointCount, FixedPointDollars, OrderStatus, OrderType,
+    BookSide, BuySell, ErrorResponse, FixedPointCount, FixedPointDollars, OrderStatus, OrderType,
     SelfTradePreventionType, TimeInForce, YesNo, deserialize_null_as_empty_vec, serialize_csv_opt,
 };
 use futures::stream::Stream;
@@ -81,8 +81,18 @@ pub struct Order {
     pub user_id: String,
     pub client_order_id: String,
     pub ticker: String,
-    pub side: YesNo,
-    pub action: BuySell,
+    /// Deprecated 2026-05-07; removed ~2026-05-28. Use `outcome_side`.
+    #[serde(default)]
+    pub side: Option<YesNo>,
+    /// Deprecated 2026-05-07; removed ~2026-05-28. Use `book_side`.
+    #[serde(default)]
+    pub action: Option<BuySell>,
+    /// Normalized outcome side (yes | no). Added 2026-05-07.
+    #[serde(default)]
+    pub outcome_side: Option<YesNo>,
+    /// Normalized book side (bid | ask). Added 2026-05-07.
+    #[serde(default)]
+    pub book_side: Option<BookSide>,
     #[serde(rename = "type")]
     pub order_type: OrderType,
     pub status: OrderStatus,
@@ -409,6 +419,9 @@ pub struct CreateOrderGroupRequest {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CreateOrderGroupResponse {
     pub order_group_id: String,
+    /// 0 = primary account, 1–32 = subaccount. Added 2026-05-07.
+    #[serde(default)]
+    pub subaccount: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

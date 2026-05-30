@@ -22,6 +22,9 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
 - [Rust API] Added `outcome_side: Option<YesNo>` and `book_side: Option<BookSide>` fields to
   `Order`, `Fill`, `WsFill`, `WsFillRef`, and `WsUserOrder`. These are the normalized direction
   fields Kalshi added on 2026-05-07 (`bid` ≡ `yes`, `ask` ≡ `no`).
+- [Rust API] Added `taker_outcome_side: Option<TradeTakerSide>` and `taker_book_side:
+  Option<BookSide>` to the public `Trade` (REST) and `WsTrade` / `WsTradeRef` (WebSocket) objects,
+  matching the normalized taker-direction fields added to trade responses on 2026-05-07.
 - [Rust API] Added `balance_dollars: Option<FixedPointDollars>` to `GetBalanceResponse` for the
   centi-cent precision balance field added on 2026-05-28 (direct members only).
 - [Rust API] Added `subaccount: Option<u32>` to `CreateOrderGroupResponse` for the field added on
@@ -55,6 +58,9 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
 - [Rust API] `Fill.action` changed from `BuySell` to `Option<BuySell>` for the same reason.
 - [Rust API] `WsFill.side` changed from `YesNo` to `Option<YesNo>` for the same reason.
 - [Rust API] `WsFill.action` changed from `BuySell` to `Option<BuySell>` for the same reason.
+- [Rust API] `Trade.taker_side` and `WsTrade.taker_side` changed from `TradeTakerSide` to
+  `Option<TradeTakerSide>`. The `taker_side` field was deprecated on 2026-05-07 in favor of
+  `taker_outcome_side` / `taker_book_side`. Downstream code must handle `None`.
 - [Rust API] `KalshiEnvironment::demo()` and `KalshiEnvironment::production()` now point to the new
   dedicated external API hostnames. Code that hard-coded the old host strings must update.
 - [Upstream] `GET /margin/fee_tiers` response no longer returns `maker_fee_tiers` /

@@ -32,10 +32,14 @@ examples are ambiguous.
   precise millisecond timing matters.
 
 - The `side` and `action` fields on `Order`, `Fill`, and `WsFill` were deprecated by Kalshi on
-  2026-05-07 and removed ~2026-05-28. The new normalized fields are `outcome_side` (`yes` | `no`)
-  and `book_side` (`bid` | `ask`), where `bid` ≡ `yes` and `ask` ≡ `no`. All four fields are now
-  `Option` to tolerate responses that carry the old fields, the new fields, or both during any
-  transition window.
+  2026-05-07. The new normalized fields are `outcome_side` (`yes` | `no`) and `book_side`
+  (`bid` | `ask`), where `bid` ≡ `yes` and `ask` ≡ `no`. The OpenAPI/AsyncAPI specs still mark the
+  legacy fields required ("not removed before May 14, 2026"), but the changelog scheduled removal
+  for 2026-05-28. To survive either state, the legacy fields are modeled as `Option`, and the new
+  normalized fields are also `Option` so older payloads (lacking them) still parse.
+- The public `Trade` object (REST `Trade`, WebSocket `WsTrade`) uses the taker-prefixed variants:
+  `taker_side` (deprecated) plus `taker_outcome_side` / `taker_book_side`. These follow the same
+  `Option` treatment for the same reasons.
 
 - The `/margin/fee_tiers` response was restructured on 2026-05-11. The previous tier-name maps
   (`maker_fee_tiers`, `taker_fee_tiers`) were replaced by per-ticker decimal-rate maps

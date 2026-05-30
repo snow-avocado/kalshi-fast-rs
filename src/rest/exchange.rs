@@ -133,6 +133,11 @@ pub struct GetSeriesFeeChangesResponse {
 /// `taker_fee_tiers` tier-name maps were replaced by `maker_fee_rates` /
 /// `taker_fee_rates`, which map market ticker → decimal fee rate.
 /// Fee = `notional * rate` (e.g. `0.0008` = 8 bps).
+///
+/// Note: this endpoint is documented in the Kalshi changelog but is not present
+/// in the published OpenAPI spec, so the rate values are kept as untyped JSON
+/// (`serde_json::Value`) to tolerate either numeric or string encodings. Any
+/// fields beyond the two rate maps are ignored.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetMarginFeeTiersResponse {
     /// Market ticker → maker fee rate (decimal fraction of notional).

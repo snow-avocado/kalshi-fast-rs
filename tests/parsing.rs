@@ -2,17 +2,17 @@
 
 pub(crate) use cargo_husky as _;
 use kalshi_fast::{
-    ApplySubaccountTransferResponse, BuySell, CreateOrderRequest, CreateSubaccountResponse,
-    ErrorResponse, EventData, EventMetadata, EventStatus, GetAccountApiLimitsResponse,
-    GetEventsParams, GetExchangeAnnouncementsResponse, GetExchangeScheduleResponse,
-    GetExchangeStatusResponse, GetFillsParams, GetFillsResponse, GetMarketOrderbookResponse,
-    GetMarketsParams, GetOrderQueuePositionsParams, GetOrdersParams, GetPositionsParams,
-    GetSeriesFeeChangesParams, GetSeriesFeeChangesResponse, GetSettlementsParams,
-    GetSettlementsResponse, GetSubaccountBalancesResponse, GetSubaccountTransfersParams,
-    GetSubaccountTransfersResponse, GetTradesParams, GetTradesResponse,
-    GetUserDataTimestampResponse, MarketMetadata, MarketStatus, MarketStatusConversionError,
-    MarketStatusQuery, MveFilter, OrderStatus, OrderType, PositionCountFilter, PriceRange,
-    SelfTradePreventionType, TimeInForce, YesNo,
+    ApplySubaccountTransferResponse, BookSide, BuySell, CreateOrderRequest,
+    CreateSubaccountResponse, ErrorResponse, EventData, EventMetadata, EventStatus,
+    GetAccountApiLimitsResponse, GetEventsParams, GetExchangeAnnouncementsResponse,
+    GetExchangeScheduleResponse, GetExchangeStatusResponse, GetFillsParams, GetFillsResponse,
+    GetMarketOrderbookResponse, GetMarketsParams, GetOrderQueuePositionsParams, GetOrdersParams,
+    GetPositionsParams, GetSeriesFeeChangesParams, GetSeriesFeeChangesResponse,
+    GetSettlementsParams, GetSettlementsResponse, GetSubaccountBalancesResponse,
+    GetSubaccountTransfersParams, GetSubaccountTransfersResponse, GetTradesParams,
+    GetTradesResponse, GetUserDataTimestampResponse, MarketMetadata, MarketStatus,
+    MarketStatusConversionError, MarketStatusQuery, MveFilter, OrderStatus, OrderType,
+    PositionCountFilter, PriceRange, SelfTradePreventionType, TimeInForce, TradeTakerSide, YesNo,
 };
 
 // ============================================================================
@@ -1030,6 +1030,8 @@ fn get_trades_response_deserializes() {
             "yes_price_dollars": "0.5500",
             "no_price_dollars": "0.4500",
             "taker_side": "yes",
+            "taker_outcome_side": "yes",
+            "taker_book_side": "bid",
             "created_time": "2026-04-16T12:00:00Z"
         }],
         "cursor": "c1"
@@ -1038,6 +1040,15 @@ fn get_trades_response_deserializes() {
     let resp: GetTradesResponse = serde_json::from_str(json).unwrap();
     assert_eq!(resp.trades.len(), 1);
     assert_eq!(resp.trades[0].count_fp, "2.00");
+    // Normalized direction fields added 2026-05-07.
+    assert!(matches!(
+        resp.trades[0].taker_outcome_side,
+        Some(TradeTakerSide::Yes)
+    ));
+    assert!(matches!(
+        resp.trades[0].taker_book_side,
+        Some(BookSide::Bid)
+    ));
     assert_eq!(resp.cursor, Some("c1".into()));
 }
 

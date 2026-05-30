@@ -33,6 +33,11 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
   added on 2026-05-07. Pass `"self"` to restrict to quotes on the authenticated user's RFQs.
 - [Rust API] Added `WsMarketLifecycleEventType::MetadataUpdated` variant for the new lifecycle event
   type added on 2026-05-11, fired when market metadata (name, title, subtitles) changes.
+- [Rust API] Surfaced the top-level `metadata_updated` payload values on `WsMarketLifecycleV2` /
+  `WsMarketLifecycleV2Ref`: added `floor_strike: Option<f64>` and `yes_sub_title: Option<String>`
+  (per AsyncAPI these appear at the top level only on `metadata_updated`, distinct from the
+  `additional_metadata.*` copies emitted on creation), plus a top-level flatten `extra` map so other
+  conditional lifecycle keys are no longer silently discarded.
 - [Rust API] Added the `event_fee_update` WebSocket message: new `WsEventFeeUpdate` /
   `WsEventFeeUpdateRef` types, a `WsMsgType::EventFeeUpdate` variant, and
   `WsDataMessageV2::EventFeeUpdate` / `WsDataMessageRef::EventFeeUpdate` variants. This message is

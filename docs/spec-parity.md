@@ -45,6 +45,15 @@ examples are ambiguous.
   (`maker_fee_tiers`, `taker_fee_tiers`) were replaced by per-ticker decimal-rate maps
   (`maker_fee_rates`, `taker_fee_rates`). Fee is computed as `notional * rate`.
 
+- `event_fee_update` is an AsyncAPI message delivered on the `market_lifecycle_v2` channel (it is
+  not a separately-subscribable channel). It is modeled by `WsEventFeeUpdate`. `fee_type_override`
+  is kept as `Option<String>` rather than reusing the `FeeType` enum, because the spec includes a
+  `quadratic_with_maker_fees` variant not present in `FeeType` and the field must stay lossless for
+  fee math. Both override fields are nullable (`None` when the override is cleared).
+- The AsyncAPI marks several timestamp/required fields that the exchange may omit in practice
+  (`ts_ms` on ticker/trade/order-group messages, the legacy direction fields). These are modeled as
+  `Option` so parsing never fails on their absence.
+
 ## Test Strategy
 
 - Deterministic parsing and behavior checks: `tests/parsing.rs`,

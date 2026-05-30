@@ -33,6 +33,14 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
   added on 2026-05-07. Pass `"self"` to restrict to quotes on the authenticated user's RFQs.
 - [Rust API] Added `WsMarketLifecycleEventType::MetadataUpdated` variant for the new lifecycle event
   type added on 2026-05-11, fired when market metadata (name, title, subtitles) changes.
+- [Rust API] Added the `event_fee_update` WebSocket message: new `WsEventFeeUpdate` /
+  `WsEventFeeUpdateRef` types, a `WsMsgType::EventFeeUpdate` variant, and
+  `WsDataMessageV2::EventFeeUpdate` / `WsDataMessageRef::EventFeeUpdate` variants. This message is
+  delivered on the existing `market_lifecycle_v2` channel and carries `event_ticker`,
+  `fee_type_override`, and `fee_multiplier_override` (both overrides `null` when cleared).
+  Previously these messages surfaced as `WsMessageV2::Unknown`.
+- [Rust API] Added the spec-required `ts_ms` (matching-engine timestamp, ms) to `WsOrderGroupUpdate`
+  and `WsOrderGroupUpdateRef`, which were previously dropping the field.
 - [Rust API] Added `get_margin_fee_tiers()` method and `GetMarginFeeTiersResponse` struct for the
   `GET /margin/fee_tiers` endpoint. The response uses `maker_fee_rates` / `taker_fee_rates` (market
   ticker → decimal fee rate maps, fee = `notional * rate`).

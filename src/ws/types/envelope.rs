@@ -195,6 +195,11 @@ impl WsEnvelope {
                 seq,
                 msg: parse_msg(&msg)?,
             })),
+            WsMsgType::EventFeeUpdate => Ok(WsMessageV2::Data(WsDataMessageV2::EventFeeUpdate {
+                sid,
+                seq,
+                msg: parse_msg(&msg)?,
+            })),
             WsMsgType::Multivariate | WsMsgType::MultivariateLookup => {
                 Ok(WsMessageV2::Data(WsDataMessageV2::Multivariate {
                     sid,
@@ -386,6 +391,11 @@ impl<'a> WsEnvelopeRef<'a> {
                 seq,
                 msg: parse_borrowed_msg(msg)?,
             })),
+            WsMsgType::EventFeeUpdate => Ok(WsMessageRef::Data(WsDataMessageRef::EventFeeUpdate {
+                sid,
+                seq,
+                msg: parse_borrowed_msg(msg)?,
+            })),
             WsMsgType::Multivariate | WsMsgType::MultivariateLookup => {
                 Ok(WsMessageRef::Data(WsDataMessageRef::Multivariate {
                     sid,
@@ -517,6 +527,11 @@ pub enum WsDataMessageV2 {
         seq: Option<u64>,
         msg: WsEventLifecycle,
     },
+    EventFeeUpdate {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsEventFeeUpdate,
+    },
     Multivariate {
         sid: Option<u64>,
         seq: Option<u64>,
@@ -585,6 +600,11 @@ pub enum WsDataMessageRef<'a> {
         sid: Option<u64>,
         seq: Option<u64>,
         msg: WsEventLifecycleRef<'a>,
+    },
+    EventFeeUpdate {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsEventFeeUpdateRef<'a>,
     },
     Multivariate {
         sid: Option<u64>,
@@ -658,6 +678,11 @@ impl<'a> WsDataMessageRef<'a> {
                 }
             }
             WsDataMessageRef::EventLifecycle { sid, seq, msg } => WsDataMessageV2::EventLifecycle {
+                sid,
+                seq,
+                msg: msg.into_owned(),
+            },
+            WsDataMessageRef::EventFeeUpdate { sid, seq, msg } => WsDataMessageV2::EventFeeUpdate {
                 sid,
                 seq,
                 msg: msg.into_owned(),
@@ -867,6 +892,54 @@ mod tests {
             msg,
             WsMessageV2::Data(WsDataMessageV2::Ticker { .. })
         ));
+    }
+
+    #[test]
+    fn ws_envelope_into_message_event_fee_update() {
+        // Delivered on the market_lifecycle_v2 channel; both overrides set.
+        let json = r#"{
+            "type":"event_fee_update",
+            "sid":7,
+            "seq":8,
+            "msg":{
+                "event_ticker":"KXHIGHNY-24JAN01",
+                "fee_type_override":"quadratic_with_maker_fees",
+                "fee_multiplier_override":1.5
+            }
+        }"#;
+        let env: WsEnvelope = serde_json::from_str(json).unwrap();
+        let msg = env.into_message().unwrap();
+        match msg {
+            WsMessageV2::Data(WsDataMessageV2::EventFeeUpdate { msg, .. }) => {
+                assert_eq!(msg.event_ticker, "KXHIGHNY-24JAN01");
+                assert_eq!(
+                    msg.fee_type_override.as_deref(),
+                    Some("quadratic_with_maker_fees")
+                );
+                assert_eq!(msg.fee_multiplier_override, Some(1.5));
+            }
+            _ => panic!("expected event_fee_update data message"),
+        }
+
+        // Cleared override arrives as JSON null -> None, and the borrowed path
+        // must round-trip to the same owned shape.
+        let cleared = r#"{
+            "type":"event_fee_update",
+            "sid":7,
+            "msg":{
+                "event_ticker":"KXHIGHNY-24JAN01",
+                "fee_type_override":null,
+                "fee_multiplier_override":null
+            }
+        }"#;
+        let msg_ref = WsMessageRef::from_bytes(cleared.as_bytes()).unwrap();
+        match msg_ref.into_owned().unwrap() {
+            WsMessageV2::Data(WsDataMessageV2::EventFeeUpdate { msg, .. }) => {
+                assert!(msg.fee_type_override.is_none());
+                assert!(msg.fee_multiplier_override.is_none());
+            }
+            _ => panic!("expected event_fee_update data message"),
+        }
     }
 
     #[test]

@@ -10,7 +10,8 @@ use crate::rest::orders::GetOrdersResponse;
 use crate::rest::pagination::{CursorPager, stream_items};
 use crate::rest::portfolio::GetFillsResponse;
 use crate::types::{
-    FixedPointCount, FixedPointDollars, MveFilter, TradeTakerSide, deserialize_null_as_empty_vec,
+    BookSide, FixedPointCount, FixedPointDollars, MveFilter, TradeTakerSide,
+    deserialize_null_as_empty_vec,
 };
 use futures::stream::Stream;
 use reqwest::Method;
@@ -24,7 +25,16 @@ pub struct Trade {
     pub count_fp: FixedPointCount,
     pub yes_price_dollars: FixedPointDollars,
     pub no_price_dollars: FixedPointDollars,
-    pub taker_side: TradeTakerSide,
+    /// Deprecated 2026-05-07. Use `taker_outcome_side` / `taker_book_side`.
+    /// Optional to tolerate eventual removal by the exchange.
+    #[serde(default)]
+    pub taker_side: Option<TradeTakerSide>,
+    /// Normalized taker outcome side (yes | no). Added 2026-05-07.
+    #[serde(default)]
+    pub taker_outcome_side: Option<TradeTakerSide>,
+    /// Normalized taker book side (bid | ask). Added 2026-05-07.
+    #[serde(default)]
+    pub taker_book_side: Option<BookSide>,
     pub created_time: String,
 }
 

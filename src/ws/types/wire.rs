@@ -95,6 +95,12 @@ pub(super) enum WsWireMessage {
         seq: Option<u64>,
         msg: WsEventLifecycle,
     },
+    #[serde(rename = "event_fee_update")]
+    EventFeeUpdate {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsEventFeeUpdate,
+    },
     #[serde(rename = "multivariate")]
     Multivariate {
         sid: Option<u64>,
@@ -221,6 +227,9 @@ impl WsWireMessage {
             }
             WsWireMessage::EventLifecycle { sid, seq, msg } => {
                 WsMessageV2::Data(WsDataMessageV2::EventLifecycle { sid, seq, msg })
+            }
+            WsWireMessage::EventFeeUpdate { sid, seq, msg } => {
+                WsMessageV2::Data(WsDataMessageV2::EventFeeUpdate { sid, seq, msg })
             }
             WsWireMessage::Multivariate { sid, seq, msg }
             | WsWireMessage::MultivariateLookup { sid, seq, msg } => {
@@ -366,6 +375,13 @@ pub(super) enum WsWireMessageRef<'a> {
         #[serde(borrow)]
         msg: WsEventLifecycleRef<'a>,
     },
+    #[serde(rename = "event_fee_update")]
+    EventFeeUpdate {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        #[serde(borrow)]
+        msg: WsEventFeeUpdateRef<'a>,
+    },
     #[serde(rename = "multivariate")]
     Multivariate {
         sid: Option<u64>,
@@ -501,6 +517,9 @@ impl<'a> WsWireMessageRef<'a> {
             }
             WsWireMessageRef::EventLifecycle { sid, seq, msg } => {
                 WsMessageRef::Data(WsDataMessageRef::EventLifecycle { sid, seq, msg })
+            }
+            WsWireMessageRef::EventFeeUpdate { sid, seq, msg } => {
+                WsMessageRef::Data(WsDataMessageRef::EventFeeUpdate { sid, seq, msg })
             }
             WsWireMessageRef::Multivariate { sid, seq, msg }
             | WsWireMessageRef::MultivariateLookup { sid, seq, msg } => {

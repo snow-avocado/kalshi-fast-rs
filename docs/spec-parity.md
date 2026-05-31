@@ -31,6 +31,29 @@ examples are ambiguous.
   should treat `ts_ms` as best-effort and fall back to `ts` (seconds) when
   precise millisecond timing matters.
 
+- The `side` and `action` fields on `Order`, `Fill`, and `WsFill` were deprecated by Kalshi on
+  2026-05-07. The new normalized fields are `outcome_side` (`yes` | `no`) and `book_side`
+  (`bid` | `ask`), where `bid` ≡ `yes` and `ask` ≡ `no`. The OpenAPI/AsyncAPI specs still mark the
+  legacy fields required ("not removed before May 14, 2026"), but the changelog scheduled removal
+  for 2026-05-28. To survive either state, the legacy fields are modeled as `Option`, and the new
+  normalized fields are also `Option` so older payloads (lacking them) still parse.
+- The public `Trade` object (REST `Trade`, WebSocket `WsTrade`) uses the taker-prefixed variants:
+  `taker_side` (deprecated) plus `taker_outcome_side` / `taker_book_side`. These follow the same
+  `Option` treatment for the same reasons.
+
+- The `/margin/fee_tiers` response was restructured on 2026-05-11. The previous tier-name maps
+  (`maker_fee_tiers`, `taker_fee_tiers`) were replaced by per-ticker decimal-rate maps
+  (`maker_fee_rates`, `taker_fee_rates`). Fee is computed as `notional * rate`.
+
+- `event_fee_update` is an AsyncAPI message delivered on the `market_lifecycle_v2` channel (it is
+  not a separately-subscribable channel). It is modeled by `WsEventFeeUpdate`. `fee_type_override`
+  is kept as `Option<String>` rather than reusing the `FeeType` enum, because the spec includes a
+  `quadratic_with_maker_fees` variant not present in `FeeType` and the field must stay lossless for
+  fee math. Both override fields are nullable (`None` when the override is cleared).
+- The AsyncAPI marks several timestamp/required fields that the exchange may omit in practice
+  (`ts_ms` on ticker/trade/order-group messages, the legacy direction fields). These are modeled as
+  `Option` so parsing never fails on their absence.
+
 ## Test Strategy
 
 - Deterministic parsing and behavior checks: `tests/parsing.rs`,

@@ -29,6 +29,8 @@ pub enum WsMsgType {
     QuoteExecuted,
     OrderGroupUpdates,
     UserOrder,
+    CfbenchmarksValue,
+    CfbenchmarksValueIndexlist,
     Unknown(String),
 }
 
@@ -60,6 +62,8 @@ impl WsMsgType {
             WsMsgType::QuoteExecuted => "quote_executed",
             WsMsgType::OrderGroupUpdates => "order_group_updates",
             WsMsgType::UserOrder => "user_order",
+            WsMsgType::CfbenchmarksValue => "cfbenchmarks_value",
+            WsMsgType::CfbenchmarksValueIndexlist => "cfbenchmarks_value_indexlist",
             WsMsgType::Unknown(value) => value.as_str(),
         }
     }
@@ -91,6 +95,8 @@ impl WsMsgType {
             "quote_executed" => WsMsgType::QuoteExecuted,
             "order_group_updates" => WsMsgType::OrderGroupUpdates,
             "user_order" => WsMsgType::UserOrder,
+            "cfbenchmarks_value" => WsMsgType::CfbenchmarksValue,
+            "cfbenchmarks_value_indexlist" => WsMsgType::CfbenchmarksValueIndexlist,
             _ => return None,
         })
     }
@@ -122,6 +128,8 @@ impl WsMsgType {
             "quote_executed" => WsMsgType::QuoteExecuted,
             "order_group_updates" => WsMsgType::OrderGroupUpdates,
             "user_order" => WsMsgType::UserOrder,
+            "cfbenchmarks_value" => WsMsgType::CfbenchmarksValue,
+            "cfbenchmarks_value_indexlist" => WsMsgType::CfbenchmarksValueIndexlist,
             _ => WsMsgType::Unknown(value),
         }
     }

@@ -1175,12 +1175,26 @@ fn get_settlements_response_deserializes() {
 
 #[test]
 fn get_account_api_limits_response_deserializes() {
-    let json = r#"{"usage_tier":"basic","read_limit":20,"write_limit":10}"#;
+    let json = r#"{
+        "usage_tier": "basic",
+        "read":  {"refill_rate": 20, "bucket_capacity": 200},
+        "write": {"refill_rate": 10, "bucket_capacity": 20},
+        "grants": [
+            {"exchange_instance":"event_contract","level":"premier","source":"volume"},
+            {"exchange_instance":"margined","level":"paragon","expires_ts":9999999999,"source":"manual"}
+        ]
+    }"#;
 
     let resp: GetAccountApiLimitsResponse = serde_json::from_str(json).unwrap();
     assert_eq!(resp.usage_tier, "basic");
-    assert_eq!(resp.read_limit, 20);
-    assert_eq!(resp.write_limit, 10);
+    assert_eq!(resp.read.refill_rate, 20);
+    assert_eq!(resp.read.bucket_capacity, 200);
+    assert_eq!(resp.write.refill_rate, 10);
+    assert_eq!(resp.grants.len(), 2);
+    assert_eq!(resp.grants[0].level, "premier");
+    assert_eq!(resp.grants[0].source, "volume");
+    assert!(resp.grants[0].expires_ts.is_none());
+    assert_eq!(resp.grants[1].expires_ts, Some(9999999999));
 }
 
 #[test]

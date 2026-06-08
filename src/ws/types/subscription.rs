@@ -25,6 +25,10 @@ pub struct WsSubscriptionParamsV2 {
     pub shard_factor: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shard_key: Option<u32>,
+    /// CF Benchmarks index IDs for `cfbenchmarks_value` subscriptions.
+    /// Use `["all"]` to receive every available index.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub index_ids: Option<Vec<String>>,
 }
 
 impl WsSubscriptionParamsV2 {

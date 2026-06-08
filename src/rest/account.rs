@@ -15,11 +15,36 @@ use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+/// Token-bucket rate-limit configuration for one endpoint group.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BucketLimit {
+    /// Tokens added to the bucket per second.
+    pub refill_rate: i64,
+    /// Maximum tokens the bucket can hold.
+    pub bucket_capacity: i64,
+}
+
+/// An active API usage-level grant (earned via volume or granted manually).
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApiUsageLevelGrant {
+    /// Exchange instance this grant applies to (`"event_contract"` or `"margined"`).
+    pub exchange_instance: String,
+    /// Usage level this grant confers (e.g. `"premier"`, `"paragon"`, `"prime"`).
+    pub level: String,
+    /// Unix timestamp (seconds) when the grant expires; `None` for permanent grants.
+    #[serde(default)]
+    pub expires_ts: Option<i64>,
+    /// How the grant was created: `"volume"` or `"manual"`.
+    pub source: String,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct GetAccountApiLimitsResponse {
     pub usage_tier: String,
-    pub read_limit: i64,
-    pub write_limit: i64,
+    pub read: BucketLimit,
+    pub write: BucketLimit,
+    /// Active usage-level grants across exchange lanes. Added 2026-06-11.
+    pub grants: Vec<ApiUsageLevelGrant>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

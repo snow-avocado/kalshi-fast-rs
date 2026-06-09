@@ -77,25 +77,32 @@ impl SubscriptionTracker {
                 }
                 let values = target.get_or_insert_with(Vec::new);
                 match action {
-                    WsUpdateAction::AddMarkets => {
+                    WsUpdateAction::AddMarkets | WsUpdateAction::SubscribeIndices => {
                         for value in incoming {
                             if !values.iter().any(|v| v == &value) {
                                 values.push(value);
                             }
                         }
                     }
-                    WsUpdateAction::DeleteMarkets => {
+                    WsUpdateAction::DeleteMarkets | WsUpdateAction::UnsubscribeIndices => {
                         values.retain(|current| !incoming.iter().any(|value| value == current));
                         if values.is_empty() {
                             *target = None;
                         }
                     }
-                    WsUpdateAction::GetSnapshot => {}
+                    WsUpdateAction::GetSnapshot | WsUpdateAction::Indexlist => {}
                 }
             };
 
-        apply_vec(&mut params.market_tickers, incoming_tickers, update.action);
-        apply_vec(&mut params.market_ids, incoming_ids, update.action);
+        if update.action.is_index_action() {
+            // CF Benchmarks index actions only mutate the tracked index set so
+            // that a reconnect resubscribes with the correct indices.
+            let incoming_indices = update.index_ids.clone().unwrap_or_default();
+            apply_vec(&mut params.index_ids, incoming_indices, update.action);
+        } else {
+            apply_vec(&mut params.market_tickers, incoming_tickers, update.action);
+            apply_vec(&mut params.market_ids, incoming_ids, update.action);
+        }
 
         if let Some(value) = update.send_initial_snapshot {
             params.send_initial_snapshot = Some(value);
@@ -176,6 +183,7 @@ mod tests {
             market_ids: None,
             send_initial_snapshot: Some(true),
             skip_ticker_ack: Some(true),
+            index_ids: None,
         };
         tracker.apply_update(&update);
 
@@ -218,10 +226,58 @@ mod tests {
             market_ids: None,
             send_initial_snapshot: None,
             skip_ticker_ack: None,
+            index_ids: None,
         };
         tracker.apply_update(&update);
 
         let updated = tracker.active.get(&10).unwrap();
         assert_eq!(updated.market_tickers, params.market_tickers);
+    }
+
+    #[test]
+    fn subscription_tracker_apply_update_tracks_cfbenchmarks_indices() {
+        let mut tracker = SubscriptionTracker::default();
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::CfbenchmarksValue],
+            index_ids: Some(vec!["BRTI".to_string()]),
+            ..Default::default()
+        };
+        tracker.active.insert(7, params);
+
+        let add = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::SubscribeIndices,
+            sid: Some(7),
+            sids: None,
+            market_ticker: None,
+            market_tickers: None,
+            market_id: None,
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+            index_ids: Some(vec!["ETHUSD_RR".to_string()]),
+        };
+        tracker.apply_update(&add);
+        let updated = tracker.active.get(&7).unwrap();
+        let indices = updated.index_ids.as_ref().unwrap();
+        assert!(indices.contains(&"BRTI".to_string()));
+        assert!(indices.contains(&"ETHUSD_RR".to_string()));
+
+        let remove = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::UnsubscribeIndices,
+            sid: Some(7),
+            sids: None,
+            market_ticker: None,
+            market_tickers: None,
+            market_id: None,
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+            index_ids: Some(vec!["BRTI".to_string()]),
+        };
+        tracker.apply_update(&remove);
+        let updated = tracker.active.get(&7).unwrap();
+        let indices = updated.index_ids.as_ref().unwrap();
+        assert!(!indices.contains(&"BRTI".to_string()));
+        assert!(indices.contains(&"ETHUSD_RR".to_string()));
     }
 }

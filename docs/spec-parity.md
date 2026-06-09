@@ -75,7 +75,18 @@ examples are ambiguous.
   `cfbenchmarks_value_indexlist` (the full set of available index IDs). Both are modeled as
   `WsCfBenchmarksValue` / `WsCfBenchmarksIndexList` and routed through the standard
   `WsDataMessageV2` enum. `last_60s_windowed_average_15min` on `WsCfBenchmarksValue` is `Option`
-  because the spec marks it conditional.
+  because the spec marks it conditional. The documented post-subscribe workflow (discover indices
+  via `indexlist`, then add/remove with `subscribe_indices` / `unsubscribe_indices`) is supported
+  through `update_subscription_v2` using the `WsUpdateAction::SubscribeIndices` /
+  `UnsubscribeIndices` / `Indexlist` actions plus the `index_ids` field on
+  `WsUpdateSubscriptionParamsV2`. `validate_update` rejects mixing index actions with market targets
+  and requires `index_ids` for the add/remove actions, matching the AsyncAPI error semantics.
+
+- `GET /account/endpoint_costs` (`get_account_endpoint_costs`) is modeled as a public (unauthed)
+  endpoint because the OpenAPI operation declares no `security` requirement, unlike `/account/limits`.
+  `ApiUsageLevelGrant.exchange_instance` is kept as `String` rather than an `ExchangeInstance` enum
+  (`event_contract` | `margined`); the raw string round-trips losslessly and tolerates any future
+  exchange-instance values without a crate update.
 - The AsyncAPI marks several timestamp/required fields that the exchange may omit in practice
   (`ts_ms` on ticker/trade/order-group messages, the legacy direction fields). These are modeled as
   `Option` so parsing never fails on their absence.

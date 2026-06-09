@@ -24,7 +24,7 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
 | Margin fee-tier returns active rates (2026-06-03/11) | No code change — exchange bug fix only |
 | Perps volume/OI notional fields on margin markets (2026-06-05/11) | No code change — margin market types not in crate |
 | Tick size on `GET /margin/markets` (2026-06-03/11) | No code change — margin market types not in crate |
-| Automated API rate-limit tiers / grants (2026-06-06/11) | **Breaking** — replaced `GetAccountApiLimitsResponse`; added `BucketLimit`, `ApiUsageLevelGrant` |
+| Automated API rate-limit tiers / grants (2026-06-06) | **Breaking** — replaced `GetAccountApiLimitsResponse`; added `BucketLimit`, `ApiUsageLevelGrant`; added `GET /account/endpoint_costs` (`get_account_endpoint_costs`, `GetAccountEndpointCostsResponse`, `EndpointTokenCost`) |
 | Fractional contract quantities for RFQs (2026-05-26/2026-06-11) | No code change — `contracts_fp` already present in `CreateRfqRequest` |
 | Legacy order endpoints cost 10× rate-limit tokens (2026-06-04) | No code change — operational rate-limit change only |
 | Post Only Cross Cancel `last_update_reason` value (2026-06-04) | No code change — `last_update_reason` not modeled in `Order`; tolerated by existing `extra` flatten if present |
@@ -53,6 +53,15 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
 - [Rust API] Added `BucketLimit` and `ApiUsageLevelGrant` structs (2026-06-06). `BucketLimit` holds
   `refill_rate: i64` and `bucket_capacity: i64`. `ApiUsageLevelGrant` holds `exchange_instance`,
   `level`, `source: String`, and `expires_ts: Option<i64>` (absent for non-expiring grants).
+- [Rust API] Added `get_account_endpoint_costs()` method and `GetAccountEndpointCostsResponse` /
+  `EndpointTokenCost` structs for the new public `GET /account/endpoint_costs` endpoint, which lists
+  API v2 endpoints whose token cost differs from the default cost.
+- [Rust API] Added CF Benchmarks subscription-update support so the documented post-subscribe
+  workflow is reachable: `WsUpdateAction::SubscribeIndices` / `UnsubscribeIndices` / `Indexlist`
+  variants and an `index_ids: Option<Vec<String>>` field on `WsUpdateSubscriptionParamsV2`. The
+  subscription tracker now folds index add/remove updates into the resubscribe state, and
+  `validate_update` enforces that index actions carry no market targets and that
+  `subscribe_indices` / `unsubscribe_indices` include `index_ids`.
 - [Rust API] Added `FeeType::QuadraticWithMakerFees` variant (serialized
   `quadratic_with_maker_fees`). `FeeType` now also carries an `#[serde(other)] Unknown` catch-all
   so unknown future variants never panic.
@@ -78,6 +87,10 @@ For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md)
   2026-06-06). Replace `resp.read_limit` → `resp.read.refill_rate` (or `.bucket_capacity`) and
   `resp.write_limit` → `resp.write.refill_rate`. The `grants` field is new; downstream exhaustive
   struct destructuring must add it.
+- [Rust API] `WsUpdateAction` gained `SubscribeIndices`, `UnsubscribeIndices`, and `Indexlist`
+  variants, and `WsUpdateSubscriptionParamsV2` gained an `index_ids` field. Downstream code with
+  exhaustive matches over `WsUpdateAction` or struct-literal construction of
+  `WsUpdateSubscriptionParamsV2` must be updated.
 
 
 ## [0.5.0] - 2026-05-29

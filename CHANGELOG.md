@@ -8,6 +8,91 @@ Kalshi docs snapshot tracked by that release.
 For crate versioning policy and bump rules, see [`VERSIONING.md`](VERSIONING.md).
 
 
+## [0.6.0] - 2026-06-08
+
+### Compatibility
+
+- Docs snapshot: 2026-06-08
+- OpenAPI: 3.20.0
+- AsyncAPI: 2.0.0
+- Validated through changelog: 2026-06-08
+
+**Changelog entries since 0.5.0 watermark (2026-06-04) and disposition:**
+
+| Entry | Action |
+|---|---|
+| Margin fee-tier returns active rates (2026-06-03/11) | No code change — exchange bug fix only |
+| Perps volume/OI notional fields on margin markets (2026-06-05/11) | No code change — margin market types not in crate |
+| Tick size on `GET /margin/markets` (2026-06-03/11) | No code change — margin market types not in crate |
+| Automated API rate-limit tiers / grants (2026-06-06) | **Breaking** — replaced `GetAccountApiLimitsResponse`; added `BucketLimit`, `ApiUsageLevelGrant`; added `GET /account/endpoint_costs` (`get_account_endpoint_costs`, `GetAccountEndpointCostsResponse`, `EndpointTokenCost`) |
+| Fractional contract quantities for RFQs (2026-05-26/2026-06-11) | No code change — `contracts_fp` already present in `CreateRfqRequest` |
+| Legacy order endpoints cost 10× rate-limit tokens (2026-06-04) | No code change — operational rate-limit change only |
+| Post Only Cross Cancel `last_update_reason` value (2026-06-04) | No code change — `last_update_reason` not modeled in `Order`; tolerated by existing `extra` flatten if present |
+| Transfer-scoped API key permissions (2026-06-03) | No code change — scopes stored as `Vec<String>` already |
+| Block trade indicators on public trade endpoints (2026-05-29/2026-06-01) | Added `is_block_trade` to `Trade` and `GetTradesParams` |
+| V2 event-order endpoints (`/portfolio/events/orders/*`) | Added all V2 types and six new `KalshiRestClient` methods |
+| `cfbenchmarks_value` AsyncAPI channel | Added full channel, subscription, and message support |
+| `FeeType::quadratic_with_maker_fees` | Added `QuadraticWithMakerFees` variant to `FeeType` enum |
+
+### Added
+
+- [Rust API] Added `is_block_trade: bool` (with `#[serde(default)]`) to the public REST `Trade`
+  struct (2026-05-29). Defaults to `false` for payloads predating the flag.
+- [Rust API] Added `is_block_trade: Option<bool>` filter to `GetTradesParams` so callers can filter
+  by block-trade status on `GET /markets/trades` and `GET /historical/trades`.
+- [Rust API] Added all V2 event-order types and six new `KalshiRestClient` methods for the lower-cost
+  `/portfolio/events/orders/*` endpoints: `create_order_v2`, `cancel_order_v2`, `amend_order_v2`,
+  `decrease_order_v2`, `batch_create_orders_v2`, `batch_cancel_orders_v2`. These endpoints use a
+  single price + `BookSide` instead of separate yes/no prices.
+  New request/response types: `CreateOrderV2Request`, `CreateOrderV2Response`,
+  `CancelOrderV2Params`, `CancelOrderV2Response`, `AmendOrderV2Request`, `AmendOrderV2Response`,
+  `DecreaseOrderV2Request`, `DecreaseOrderV2Response`, `BatchCreateOrdersV2Request`,
+  `BatchCreateOrderV2OrderResponse`, `BatchCreateOrdersV2Response`,
+  `BatchCancelOrderV2RequestOrder`, `BatchCancelOrdersV2Request`,
+  `BatchCancelOrderV2OrderResponse`, `BatchCancelOrdersV2Response`.
+- [Rust API] Added `BucketLimit` and `ApiUsageLevelGrant` structs (2026-06-06). `BucketLimit` holds
+  `refill_rate: i64` and `bucket_capacity: i64`. `ApiUsageLevelGrant` holds `exchange_instance`,
+  `level`, `source: String`, and `expires_ts: Option<i64>` (absent for non-expiring grants).
+- [Rust API] Added `get_account_endpoint_costs()` method and `GetAccountEndpointCostsResponse` /
+  `EndpointTokenCost` structs for the new public `GET /account/endpoint_costs` endpoint, which lists
+  API v2 endpoints whose token cost differs from the default cost.
+- [Rust API] Added CF Benchmarks subscription-update support so the documented post-subscribe
+  workflow is reachable: `WsUpdateAction::SubscribeIndices` / `UnsubscribeIndices` / `Indexlist`
+  variants and an `index_ids: Option<Vec<String>>` field on `WsUpdateSubscriptionParamsV2`. The
+  subscription tracker now folds index add/remove updates into the resubscribe state, and
+  `validate_update` enforces that index actions carry no market targets and that
+  `subscribe_indices` / `unsubscribe_indices` include `index_ids`.
+- [Rust API] Added `FeeType::QuadraticWithMakerFees` variant (serialized
+  `quadratic_with_maker_fees`). `FeeType` now also carries an `#[serde(other)] Unknown` catch-all
+  so unknown future variants never panic.
+- [Rust API] Added full `cfbenchmarks_value` channel support:
+  - `WsChannelV2::CfbenchmarksValue` variant
+  - `index_ids: Option<Vec<String>>` parameter on `WsSubscriptionParamsV2` (use `["all"]` for all
+    indices)
+  - `WsMsgType::CfbenchmarksValue` and `WsMsgType::CfbenchmarksValueIndexlist` variants
+  - New types `WsCfBenchmarksValue`, `WsCfBenchmarksValueRef`, `WsCfBenchmarksAvgData`,
+    `WsCfBenchmarksIndexList`, `WsCfBenchmarksIndexListRef` in `ws::types::messages::cfbenchmarks`
+  - `WsDataMessageV2::CfbenchmarksValue` and `WsDataMessageV2::CfbenchmarksValueIndexlist` variants
+    routed through both the wire and envelope parse paths
+
+### Changed
+
+- [Rust API] `GetAccountApiLimitsResponse` now reflects the current OpenAPI shape: nested
+  `read: BucketLimit` and `write: BucketLimit` objects plus `grants: Vec<ApiUsageLevelGrant>`.
+  The old flat `read_limit: i64` / `write_limit: i64` fields are removed.
+
+### Breaking
+
+- [Rust API] `GetAccountApiLimitsResponse` field layout changed (automated API rate-limit tiers,
+  2026-06-06). Replace `resp.read_limit` → `resp.read.refill_rate` (or `.bucket_capacity`) and
+  `resp.write_limit` → `resp.write.refill_rate`. The `grants` field is new; downstream exhaustive
+  struct destructuring must add it.
+- [Rust API] `WsUpdateAction` gained `SubscribeIndices`, `UnsubscribeIndices`, and `Indexlist`
+  variants, and `WsUpdateSubscriptionParamsV2` gained an `index_ids` field. Downstream code with
+  exhaustive matches over `WsUpdateAction` or struct-literal construction of
+  `WsUpdateSubscriptionParamsV2` must be updated.
+
+
 ## [0.5.0] - 2026-05-29
 
 ### Compatibility

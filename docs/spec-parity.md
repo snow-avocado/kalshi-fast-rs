@@ -47,9 +47,46 @@ examples are ambiguous.
 
 - `event_fee_update` is an AsyncAPI message delivered on the `market_lifecycle_v2` channel (it is
   not a separately-subscribable channel). It is modeled by `WsEventFeeUpdate`. `fee_type_override`
-  is kept as `Option<String>` rather than reusing the `FeeType` enum, because the spec includes a
-  `quadratic_with_maker_fees` variant not present in `FeeType` and the field must stay lossless for
-  fee math. Both override fields are nullable (`None` when the override is cleared).
+  is kept as `Option<String>` rather than reusing the `FeeType` enum so the raw string survives any
+  future fee-type additions without a crate update. Both override fields are nullable (`None` when
+  the override is cleared).
+
+- `FeeType` enum now includes `QuadraticWithMakerFees` (serialized `quadratic_with_maker_fees`),
+  added to the OpenAPI spec in 2026. An `#[serde(other)] Unknown` catch-all is also present so
+  unrecognised future variants never panic during deserialization. `fee_type_override` on
+  `WsEventFeeUpdate` remains `Option<String>` for lossless round-trip regardless.
+
+- `is_block_trade: bool` was added to the public REST `Trade` struct (2026-05-29). The field is
+  `#[serde(default)]` (defaults to `false`) so payloads predating the flag still parse. The query
+  filter `GetTradesParams::is_block_trade: Option<bool>` lets callers filter by block-trade status.
+
+- `GET /account/limits` (`get_account_api_limits`) response was restructured in 2026-06 (automated
+  API rate-limit tiers). The old flat shape (`read_limit: i64, write_limit: i64`) was replaced by
+  nested `BucketLimit` objects (`read: BucketLimit, write: BucketLimit`) plus a `grants:
+  Vec<ApiUsageLevelGrant>` array. The `GetAccountApiLimitsResponse` struct was updated accordingly;
+  old field access will not compile (intentional minor-version break, 0.5.0 → 0.6.0).
+  `ApiUsageLevelGrant.expires_ts` is `Option<i64>` because the field is absent for non-expiring
+  grants.
+
+- `cfbenchmarks_value` is a new AsyncAPI channel (introduced 2026-06) that delivers CF Benchmarks
+  index values. It uses `index_ids` (not market tickers) for subscription parameters; pass
+  `["all"]` to receive all available indices. The channel emits two message types:
+  `cfbenchmarks_value` (per-index value + 60-second windowed average) and
+  `cfbenchmarks_value_indexlist` (the full set of available index IDs). Both are modeled as
+  `WsCfBenchmarksValue` / `WsCfBenchmarksIndexList` and routed through the standard
+  `WsDataMessageV2` enum. `last_60s_windowed_average_15min` on `WsCfBenchmarksValue` is `Option`
+  because the spec marks it conditional. The documented post-subscribe workflow (discover indices
+  via `indexlist`, then add/remove with `subscribe_indices` / `unsubscribe_indices`) is supported
+  through `update_subscription_v2` using the `WsUpdateAction::SubscribeIndices` /
+  `UnsubscribeIndices` / `Indexlist` actions plus the `index_ids` field on
+  `WsUpdateSubscriptionParamsV2`. `validate_update` rejects mixing index actions with market targets
+  and requires `index_ids` for the add/remove actions, matching the AsyncAPI error semantics.
+
+- `GET /account/endpoint_costs` (`get_account_endpoint_costs`) is modeled as a public (unauthed)
+  endpoint because the OpenAPI operation declares no `security` requirement, unlike `/account/limits`.
+  `ApiUsageLevelGrant.exchange_instance` is kept as `String` rather than an `ExchangeInstance` enum
+  (`event_contract` | `margined`); the raw string round-trips losslessly and tolerates any future
+  exchange-instance values without a crate update.
 - The AsyncAPI marks several timestamp/required fields that the exchange may omit in practice
   (`ts_ms` on ticker/trade/order-group messages, the legacy direction fields). These are modeled as
   `Option` so parsing never fails on their absence.

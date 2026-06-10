@@ -36,6 +36,10 @@ pub struct Trade {
     #[serde(default)]
     pub taker_book_side: Option<BookSide>,
     pub created_time: String,
+    /// True for block trades matched off-book (e.g. via RFQ). Added 2026-05-29.
+    /// Defaults to `false` for payloads predating this field.
+    #[serde(default)]
+    pub is_block_trade: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -54,6 +58,9 @@ pub struct GetTradesParams {
     pub limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor: Option<String>,
+    /// Filter by block trade status. Omit to return all trades.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_block_trade: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

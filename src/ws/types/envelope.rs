@@ -244,6 +244,20 @@ impl WsEnvelope {
                 seq,
                 msg: parse_msg(&msg)?,
             })),
+            WsMsgType::CfbenchmarksValue => {
+                Ok(WsMessageV2::Data(WsDataMessageV2::CfbenchmarksValue {
+                    sid,
+                    seq,
+                    msg: parse_msg(&msg)?,
+                }))
+            }
+            WsMsgType::CfbenchmarksValueIndexlist => Ok(WsMessageV2::Data(
+                WsDataMessageV2::CfbenchmarksValueIndexlist {
+                    sid,
+                    seq,
+                    msg: parse_msg(&msg)?,
+                },
+            )),
             WsMsgType::Communications => Ok(WsMessageV2::Unknown {
                 msg_type: WsMsgType::Communications,
                 raw: msg,
@@ -440,6 +454,20 @@ impl<'a> WsEnvelopeRef<'a> {
                 seq,
                 msg: parse_borrowed_msg(msg)?,
             })),
+            WsMsgType::CfbenchmarksValue => {
+                Ok(WsMessageRef::Data(WsDataMessageRef::CfbenchmarksValue {
+                    sid,
+                    seq,
+                    msg: parse_borrowed_msg(msg)?,
+                }))
+            }
+            WsMsgType::CfbenchmarksValueIndexlist => Ok(WsMessageRef::Data(
+                WsDataMessageRef::CfbenchmarksValueIndexlist {
+                    sid,
+                    seq,
+                    msg: parse_borrowed_msg(msg)?,
+                },
+            )),
             WsMsgType::Communications => Ok(WsMessageRef::Unknown {
                 msg_type: WsMsgType::Communications,
                 raw: msg,
@@ -552,6 +580,16 @@ pub enum WsDataMessageV2 {
         seq: Option<u64>,
         msg: WsUserOrder,
     },
+    CfbenchmarksValue {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsCfBenchmarksValue,
+    },
+    CfbenchmarksValueIndexlist {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsCfBenchmarksIndexList,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -625,6 +663,16 @@ pub enum WsDataMessageRef<'a> {
         sid: Option<u64>,
         seq: Option<u64>,
         msg: WsUserOrder,
+    },
+    CfbenchmarksValue {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsCfBenchmarksValueRef<'a>,
+    },
+    CfbenchmarksValueIndexlist {
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: WsCfBenchmarksIndexListRef<'a>,
     },
 }
 
@@ -706,6 +754,20 @@ impl<'a> WsDataMessageRef<'a> {
             }
             WsDataMessageRef::UserOrder { sid, seq, msg } => {
                 WsDataMessageV2::UserOrder { sid, seq, msg }
+            }
+            WsDataMessageRef::CfbenchmarksValue { sid, seq, msg } => {
+                WsDataMessageV2::CfbenchmarksValue {
+                    sid,
+                    seq,
+                    msg: msg.into_owned(),
+                }
+            }
+            WsDataMessageRef::CfbenchmarksValueIndexlist { sid, seq, msg } => {
+                WsDataMessageV2::CfbenchmarksValueIndexlist {
+                    sid,
+                    seq,
+                    msg: msg.into_owned(),
+                }
             }
         }
     }

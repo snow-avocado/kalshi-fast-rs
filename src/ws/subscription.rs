@@ -75,9 +75,10 @@ impl SubscriptionTracker {
                 if incoming.is_empty() {
                     return;
                 }
-                let values = target.get_or_insert_with(Vec::new);
+
                 match action {
                     WsUpdateAction::AddMarkets | WsUpdateAction::SubscribeIndices => {
+                        let values = target.get_or_insert_with(Vec::new);
                         for value in incoming {
                             if !values.iter().any(|v| v == &value) {
                                 values.push(value);
@@ -85,6 +86,9 @@ impl SubscriptionTracker {
                         }
                     }
                     WsUpdateAction::DeleteMarkets | WsUpdateAction::UnsubscribeIndices => {
+                        let Some(values) = target.as_mut() else {
+                            return;
+                        };
                         values.retain(|current| !incoming.iter().any(|value| value == current));
                         if values.is_empty() {
                             *target = None;
@@ -204,6 +208,37 @@ mod tests {
         );
         assert_eq!(updated.send_initial_snapshot, Some(true));
         assert_eq!(updated.skip_ticker_ack, Some(true));
+    }
+
+    #[test]
+    fn subscription_tracker_get_snapshot_preserves_absent_plural_targets() {
+        let mut tracker = SubscriptionTracker::default();
+        let params = WsSubscriptionParamsV2 {
+            channels: vec![WsChannelV2::OrderbookDelta],
+            market_ticker: Some("A".to_string()),
+            market_tickers: None,
+            market_id: Some("ID-A".to_string()),
+            market_ids: None,
+            ..Default::default()
+        };
+        tracker.active.insert(10, params.clone());
+
+        let update = WsUpdateSubscriptionParamsV2 {
+            action: WsUpdateAction::GetSnapshot,
+            sid: Some(10),
+            sids: None,
+            market_ticker: Some("B".to_string()),
+            market_tickers: None,
+            market_id: None,
+            market_ids: None,
+            send_initial_snapshot: None,
+            skip_ticker_ack: None,
+            index_ids: None,
+        };
+        tracker.apply_update(&update);
+
+        let updated = tracker.active.get(&10).unwrap();
+        assert_eq!(updated, &params);
     }
 
     #[test]

@@ -18,37 +18,20 @@ async fn main() -> anyhow::Result<()> {
     let client = KalshiRestClient::new(env).with_auth(auth);
 
     let enabled = client.get_margin_enabled().await?;
-    println!("margin trading enabled: {}", enabled.enabled);
+    println!("margin trading enabled: {enabled:#?}");
 
     let markets = client
         .get_margin_markets(Some(MarginMarketStatus::Active))
         .await?;
-    println!("active margin markets: {}", markets.markets.len());
-
-    if let Some(market) = markets.markets.first() {
-        println!(
-            "  → {}: price={}, volume={}",
-            market.ticker,
-            market.price.as_deref().unwrap_or("-"),
-            market.volume.as_deref().unwrap_or("-"),
-        );
-    }
+    println!("active margin markets: {markets:#?}");
 
     let balance = client.get_margin_balance(Some(true)).await?;
-    println!("settled funds: {}", balance.settled_funds);
-    for sub in &balance.subaccount_balances {
-        println!(
-            "  subaccount {}: equity={}, available={}",
-            sub.subaccount,
-            sub.account_equity,
-            sub.available_balance.as_deref().unwrap_or("-"),
-        );
-    }
+    println!("margin balance: {balance:#?}");
 
     let positions = client
         .get_margin_positions(GetMarginPositionsParams::default())
         .await?;
-    println!("open positions: {}", positions.positions.len());
+    println!("open positions: {positions:#?}");
 
     Ok(())
 }

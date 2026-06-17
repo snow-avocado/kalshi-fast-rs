@@ -1,46 +1,158 @@
 use crate::error::KalshiError;
 use serde::Deserialize;
+use serde_json::Value;
 
 // ---------------------------------------------------------------------------
-// Top-level message (discriminated by `type` field via untagged fallthrough)
+// User-facing message enum
 // ---------------------------------------------------------------------------
 
-/// A single data message received from the margin/perpetuals WebSocket.
+/// A message received from the margin/perpetuals WebSocket.
 ///
-/// All margin WS messages share the envelope shape:
-/// ```json
-/// { "type": "<...>", "sid": <int>, "seq": <int>?, "msg": { ... } }
-/// ```
-///
-/// Control messages (`subscribed`/`unsubscribed`) are parsed by
-/// [`parse_control_message`](crate::ws::protocol::parse_control_message) in the
-/// reader loop and forwarded as [`WsEvent::Message`]. They arrive as
-/// `Unknown { msg_type: Some("subscribed"|"unsubscribed") }` here.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(untagged)]
+/// Parsed via [`MarginDataMessage::from_bytes`]; the enum is not
+/// `Deserialize`-derived directly.  Use the typed variants when pattern
+/// matching on [`WsEvent::Message`](crate::ws::event::WsEvent::Message).
+#[derive(Debug, Clone, PartialEq)]
 pub enum MarginDataMessage {
-    /// Must come before OrderbookSnapshot — required fields make it specific.
+    // -- data messages -------------------------------------------------------
     Ticker(MarginEnvelope<TickerMsg>),
     OrderbookDelta(MarginEnvelope<OrderbookDeltaMsg>),
     Trade(MarginEnvelope<TradeMsg>),
     Fill(MarginEnvelope<FillMsg>),
     UserOrder(MarginEnvelope<UserOrderMsg>),
     OrderGroupUpdates(MarginEnvelope<OrderGroupUpdatesMsg>),
-    /// Deliberately last among known types: `bid`/`ask` are optional so it
-    /// would spuriously match narrower messages.
     OrderbookSnapshot(MarginEnvelope<OrderbookSnapshotMsg>),
-    /// Catch-all for subscribed/unsubscribed control messages and unknown
-    /// future message types.
+    // -- control messages ----------------------------------------------------
+    Subscribed {
+        id: Option<u64>,
+        sid: Option<u64>,
+    },
+    Unsubscribed {
+        id: Option<u64>,
+        sid: Option<u64>,
+    },
+    Ok {
+        id: Option<u64>,
+        sid: Option<u64>,
+        seq: Option<u64>,
+        msg: Option<Value>,
+    },
+    Error {
+        id: Option<u64>,
+        msg: MarginErrorMsg,
+    },
+    /// Catch-all for unrecognised message types (e.g. future channel types).
     Unknown {
-        #[serde(rename = "type")]
+        /// The raw `type` field value if present.
         msg_type: Option<String>,
     },
 }
 
 impl MarginDataMessage {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KalshiError> {
-        serde_json::from_slice(bytes).map_err(KalshiError::from)
+        match serde_json::from_slice::<MarginWireMessage>(bytes) {
+            Ok(wire) => Ok(wire.into()),
+            Err(_) => {
+                #[derive(Deserialize)]
+                struct Raw {
+                    #[serde(rename = "type")]
+                    msg_type: Option<String>,
+                }
+                let raw = serde_json::from_slice::<Raw>(bytes)?;
+                Ok(Self::Unknown {
+                    msg_type: raw.msg_type,
+                })
+            }
+        }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Tagged wire enum  (private – parsed first, then converted)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum MarginWireMessage {
+    #[serde(rename = "orderbook_snapshot")]
+    OrderbookSnapshot(MarginEnvelope<OrderbookSnapshotMsg>),
+    #[serde(rename = "orderbook_delta")]
+    OrderbookDelta(MarginEnvelope<OrderbookDeltaMsg>),
+    #[serde(rename = "ticker")]
+    Ticker(MarginEnvelope<TickerMsg>),
+    #[serde(rename = "trade")]
+    Trade(MarginEnvelope<TradeMsg>),
+    #[serde(rename = "fill")]
+    Fill(MarginEnvelope<FillMsg>),
+    #[serde(rename = "user_order")]
+    UserOrder(MarginEnvelope<UserOrderMsg>),
+    #[serde(rename = "order_group_updates")]
+    OrderGroupUpdates(MarginEnvelope<OrderGroupUpdatesMsg>),
+    #[serde(rename = "subscribed")]
+    Subscribed {
+        id: Option<u64>,
+        #[serde(default)]
+        sid: Option<u64>,
+        #[serde(default)]
+        msg: Option<MarginSubscribedMsg>,
+    },
+    #[serde(rename = "unsubscribed")]
+    Unsubscribed {
+        id: Option<u64>,
+        #[serde(default)]
+        sid: Option<u64>,
+    },
+    #[serde(rename = "ok")]
+    Ok {
+        id: Option<u64>,
+        #[serde(default)]
+        sid: Option<u64>,
+        #[serde(default)]
+        seq: Option<u64>,
+        #[serde(default)]
+        msg: Option<Value>,
+    },
+    #[serde(rename = "error")]
+    Error {
+        id: Option<u64>,
+        msg: MarginErrorMsg,
+    },
+}
+
+impl From<MarginWireMessage> for MarginDataMessage {
+    fn from(wire: MarginWireMessage) -> Self {
+        match wire {
+            MarginWireMessage::OrderbookSnapshot(e) => Self::OrderbookSnapshot(e),
+            MarginWireMessage::OrderbookDelta(e) => Self::OrderbookDelta(e),
+            MarginWireMessage::Ticker(e) => Self::Ticker(e),
+            MarginWireMessage::Trade(e) => Self::Trade(e),
+            MarginWireMessage::Fill(e) => Self::Fill(e),
+            MarginWireMessage::UserOrder(e) => Self::UserOrder(e),
+            MarginWireMessage::OrderGroupUpdates(e) => Self::OrderGroupUpdates(e),
+            MarginWireMessage::Subscribed { id, sid, msg } => {
+                let sid = sid.or_else(|| msg.as_ref().and_then(|m| m.sid));
+                Self::Subscribed { id, sid }
+            }
+            MarginWireMessage::Unsubscribed { id, sid } => Self::Unsubscribed { id, sid },
+            MarginWireMessage::Ok { id, sid, seq, msg } => Self::Ok { id, sid, seq, msg },
+            MarginWireMessage::Error { id, msg } => Self::Error { id, msg },
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Control message payload structs
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct MarginSubscribedMsg {
+    pub channel: Option<String>,
+    pub sid: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct MarginErrorMsg {
+    pub code: u64,
+    pub msg: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +324,10 @@ pub struct OrderGroupUpdatesMsg {
 mod tests {
     use super::*;
 
+    fn parse(bytes: &[u8]) -> MarginDataMessage {
+        MarginDataMessage::from_bytes(bytes).expect("parse ok")
+    }
+
     #[test]
     fn parse_orderbook_snapshot() {
         let json = serde_json::json!({
@@ -224,7 +340,7 @@ mod tests {
                 "ask": [["50100.00", "2.0"]]
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::OrderbookSnapshot(e) => {
                 assert_eq!(e.sid, 1);
@@ -250,7 +366,7 @@ mod tests {
                 "ts_ms": 1_700_000_000_000_i64
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::OrderbookDelta(e) => {
                 assert_eq!(e.msg.market_ticker, "KXBTCPERP1");
@@ -283,7 +399,7 @@ mod tests {
                 "ts_ms": 1_700_000_000_000_i64
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::Ticker(e) => {
                 assert_eq!(e.msg.market_ticker, "KXBTCPERP1");
@@ -307,7 +423,7 @@ mod tests {
                 "ts_ms": 1_700_000_000_000_i64
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::Trade(e) => {
                 assert_eq!(e.msg.trade_id, "t-123");
@@ -337,7 +453,7 @@ mod tests {
                 "subaccount": 1
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::Fill(e) => {
                 assert!(e.msg.is_taker);
@@ -365,7 +481,7 @@ mod tests {
                 "created_ts_ms": 1_700_000_000_000_i64
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::UserOrder(e) => {
                 assert_eq!(e.msg.side, "bid");
@@ -388,7 +504,7 @@ mod tests {
                 "ts_ms": 1_700_000_000_000_i64
             }
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         match msg {
             MarginDataMessage::OrderGroupUpdates(e) => {
                 assert_eq!(e.msg.event_type, "limit_updated");
@@ -399,44 +515,104 @@ mod tests {
     }
 
     #[test]
-    fn parse_subscribed_as_unknown() {
+    fn parse_subscribed() {
         let json = serde_json::json!({
             "type": "subscribed",
             "id": 1,
             "sid": 42
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         assert_eq!(
             msg,
-            MarginDataMessage::Unknown {
-                msg_type: Some("subscribed".into())
+            MarginDataMessage::Subscribed {
+                id: Some(1),
+                sid: Some(42)
             }
         );
     }
 
     #[test]
-    fn parse_unsubscribed_as_unknown() {
+    fn parse_subscribed_with_msg_sid() {
+        let json = serde_json::json!({
+            "type": "subscribed",
+            "id": 1,
+            "msg": {"channel": "ticker", "sid": 99}
+        });
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
+        assert_eq!(
+            msg,
+            MarginDataMessage::Subscribed {
+                id: Some(1),
+                sid: Some(99)
+            }
+        );
+    }
+
+    #[test]
+    fn parse_unsubscribed() {
         let json = serde_json::json!({
             "type": "unsubscribed",
             "sid": 42
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         assert_eq!(
             msg,
-            MarginDataMessage::Unknown {
-                msg_type: Some("unsubscribed".into())
+            MarginDataMessage::Unsubscribed {
+                id: None,
+                sid: Some(42)
             }
         );
     }
 
     #[test]
-    fn parse_unknown_type() {
+    fn parse_error() {
+        let json = serde_json::json!({
+            "type": "error",
+            "id": 1,
+            "msg": {"code": 8, "msg": "Unknown channel name"}
+        });
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
+        assert_eq!(
+            msg,
+            MarginDataMessage::Error {
+                id: Some(1),
+                msg: MarginErrorMsg {
+                    code: 8,
+                    msg: "Unknown channel name".into()
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn parse_ok() {
+        let json = serde_json::json!({
+            "type": "ok",
+            "id": 1,
+            "sid": 42,
+            "seq": 7,
+            "msg": {"ok": true}
+        });
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
+        assert_eq!(
+            msg,
+            MarginDataMessage::Ok {
+                id: Some(1),
+                sid: Some(42),
+                seq: Some(7),
+                msg: Some(serde_json::json!({"ok": true})),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_unknown_type_falls_back() {
         let json = serde_json::json!({
             "type": "some_future_channel",
             "sid": 1,
             "msg": {"foo": "bar"}
         });
-        let msg: MarginDataMessage = serde_json::from_value(json).unwrap();
+        let msg = parse(&serde_json::to_vec(&json).unwrap());
         assert_eq!(
             msg,
             MarginDataMessage::Unknown {

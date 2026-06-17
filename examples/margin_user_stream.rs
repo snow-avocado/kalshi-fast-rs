@@ -6,8 +6,8 @@
 /// Usage:
 ///   KALSHI_KEY_ID=... KALSHI_PRIVATE_KEY_PATH=... cargo run --example margin_user_stream
 use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, MarginChannel, MarginDataMessage, MarginSubscribeParams,
-    MarginWsClient, WsEvent, WsReconnectConfig,
+    KalshiAuth, KalshiEnvironment, MarginChannel, MarginSubscribeParams, MarginWsClient, WsEvent,
+    WsReconnectConfig,
 };
 
 #[tokio::main]
@@ -34,25 +34,7 @@ async fn main() -> anyhow::Result<()> {
 
     loop {
         match ws.next_event().await? {
-            WsEvent::Message(msg) => match msg {
-                MarginDataMessage::Fill(e) => {
-                    println!(
-                        "fill: order={} ticker={} price={} count={} side={}",
-                        e.msg.order_id, e.msg.market_ticker, e.msg.price, e.msg.count, e.msg.side
-                    );
-                }
-                MarginDataMessage::UserOrder(e) => {
-                    println!(
-                        "order: id={} ticker={} side={} price={} remaining={}",
-                        e.msg.order_id,
-                        e.msg.ticker,
-                        e.msg.side,
-                        e.msg.price,
-                        e.msg.remaining_count
-                    );
-                }
-                other => println!("{other:?}"),
-            },
+            WsEvent::Message(msg) => println!("{msg:#?}"),
             WsEvent::Reconnected { attempt } => {
                 println!("reconnected (attempt {attempt})")
             }

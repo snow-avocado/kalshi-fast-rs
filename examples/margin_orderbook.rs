@@ -6,8 +6,8 @@
 /// Usage:
 ///   KALSHI_KEY_ID=... KALSHI_PRIVATE_KEY_PATH=... cargo run --example margin_orderbook -- PERP_MARKET
 use kalshi_fast::{
-    KalshiAuth, KalshiEnvironment, MarginChannel, MarginDataMessage, MarginSubscribeParams,
-    MarginWsClient, WsEvent, WsReconnectConfig,
+    KalshiAuth, KalshiEnvironment, MarginChannel, MarginSubscribeParams, MarginWsClient, WsEvent,
+    WsReconnectConfig,
 };
 
 #[tokio::main]
@@ -38,21 +38,7 @@ async fn main() -> anyhow::Result<()> {
 
     loop {
         match ws.next_event().await? {
-            WsEvent::Message(msg) => match msg {
-                MarginDataMessage::OrderbookDelta(e) => {
-                    println!(
-                        "delta: {} @ {} side={}",
-                        e.msg.market_ticker, e.msg.price, e.msg.side
-                    );
-                }
-                MarginDataMessage::Trade(e) => {
-                    println!(
-                        "trade: {} id={} price={} count={}",
-                        e.msg.market_ticker, e.msg.trade_id, e.msg.price, e.msg.count
-                    );
-                }
-                other => println!("{other:?}"),
-            },
+            WsEvent::Message(msg) => println!("{msg:#?}"),
             WsEvent::Reconnected { attempt } => {
                 println!("reconnected (attempt {attempt})")
             }
